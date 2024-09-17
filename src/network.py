@@ -36,12 +36,13 @@ class ComplexConvLayer(ComplexLayer):
         self.padding = padding
         self.activation = activation()
 
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        self.conv_real = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        self.conv_imag = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
 
     def forward(self, x):
         x_real, x_imag = self.extract_real_imag(x)
-        x_real = self.conv(x_real)
-        x_imag = self.conv(x_imag)
+        x_real = self.conv_real(x_real)
+        x_imag = self.conv_imag(x_imag)
         u = self.activation(self.combine(x_real, x_imag))
         return u
 
@@ -49,19 +50,20 @@ class ComplexConvLayer(ComplexLayer):
 class Diag(ComplexLayer):
     def __init__(self, dimension):
         super().__init__()
-        self.betas = nn.Parameter(torch.ones(dimension))
+        self.betas_real = nn.Parameter(torch.ones(dimension))
+        self.betas_imag = nn.Parameter(torch.ones(dimension))
 
     def forward(self, x):
         x_real, x_imag = self.extract_real_imag(x)
         
         b, c, h, w = x_real.size()
-        x_real = x_real.view(b * c, h * w)
-        x_real = x_real @ torch.diag(torch.exp(self.betas))
-        x_real = x_real.view(b, c, h, w)
+        x_real = x_real.contiguous().view(b * c, h * w)
+        x_real = x_real @ torch.diag(torch.exp(self.betas_real))
+        x_real = x_real.contiguous().view(b, c, h, w)
         
-        x_imag = x_imag.view(b * c, h * w)
-        x_imag = x_imag @ torch.diag(torch.exp(self.betas))
-        x_imag = x_imag.view(b, c, h, w)
+        x_imag = x_imag.contiguous().view(b * c, h * w)
+        x_imag = x_imag @ torch.diag(torch.exp(self.betas_imag))
+        x_imag = x_imag.contiguous().view(b, c, h, w)
         
         return self.combine(x_real, x_imag)
 
@@ -130,9 +132,10 @@ class ComplexUNet(nn.Module):
         
         
         self.out = Diag(dimension)
-        # self.sigmoid = nn.Sigmoid()
+        self.sigma = nn.Tanh()
 
     def forward(self, x):
+        init = x
         x = self.diag1(x)
         res1 = self.down1(x)
         res2 = self.down2(res1)
@@ -146,7 +149,8 @@ class ComplexUNet(nn.Module):
         x = self.up4(x)
         
         x = self.out(x)
-        # x = self.sigmoid(x)
+        x = self.sigma(x)
+        x = init * x
         return x
         
     

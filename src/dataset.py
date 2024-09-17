@@ -47,13 +47,15 @@ class SignalDataset(torch.utils.data.Dataset):
         fecg = fecg[:, :-1, :]  # drop last freq bin  
         sum_ = self.stft.stft_only(sum_)
         sum_ = sum_[:, :-1, :]  # drop last freq bin
+        
+        sum_ = sum_ / 10.0  # scale as close to [-1, 1]
+        fecg = fecg / 10.0
+        
         return sum_, fecg
     
     
-    
-    
-if __name__ == '__main__':
 
+def main():
     from fourier import STFT
 
     dset_path = 'data/ecg'
@@ -73,3 +75,8 @@ if __name__ == '__main__':
         print(text)
         
         break
+
+    
+    
+if __name__ == '__main__':
+    main()

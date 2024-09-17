@@ -1,15 +1,15 @@
+import click
 import torch
 import torchaudio
-import matplotlib.pyplot as plt
 from scipy.io import loadmat
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style('darkgrid')
 
-from iulia_old.prepare_data import add_noise
 from fourier import STFT
 from network import ComplexUNet
-from dataset import SignalDataset
-from train import get_loaders
-
+from diffuser import Diffuser
 
 def get_model(path, sizes=(128, 128)):
     model = ComplexUNet(sizes[0] * sizes[1])
@@ -18,49 +18,61 @@ def get_model(path, sizes=(128, 128)):
     return model
 
 
-def predict(model, x, stft):
-    x = torch.tensor(x, dtype=torch.float32)
-    x = stft.stft(x)
-    x = x.unsqueeze(0)
-    with torch.no_grad():
-        y = model(x)
-    y = stft.istft(y.squeeze())
-    return y.numpy()
-
-
-### TODO: apply changes (fourier and dataset) to this script
-if __name__ == '__main__':
-    model_path = 'models/best.pth'
-    signal_path = 'data/ecg/fecgsyn3008.mat'
-    snr_db = 20
-
-    loaders = get_loaders(SignalDataset('data/ecg', snr_db=snr_db), 32, 42)
-    loader = loaders['test']
+def load_mat(path):
+    data = loadmat(path)
+    mecg = data['out']['mecg'][0][0].astype(float)
+    fecg = data['out']['fecg'][0][0].astype(float)
     
+    resampler = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
+    mecg = resampler(torch.tensor(mecg, dtype=torch.float32))
+    fecg = resampler(torch.tensor(fecg, dtype=torch.float32))
+    
+    random_start = torch.randint(0, mecg.size(-1) - 1915, (1,))
+    mecg = mecg[:, random_start:random_start+1915]
+    fecg = fecg[:, random_start:random_start+1915]
+    
+    return mecg, fecg
+
+
+@click.command()
+@click.option('-m', '--model_path', type=str, default='models/best.pth')
+@click.option('-s', '--signal_path', type=str, default='data/ecg/fecgsyn01.mat')
+@click.option('--snr_db', type=int, default=20)
+def main(model_path, signal_path, snr_db):
     model = get_model(model_path).to('cuda')
     stft = STFT()
+    diffuser = Diffuser(4, 500)
     
-    mix, fecg = next(iter(loader))
+    mecg, fecg = load_mat(signal_path)
+    sum_ = diffuser(mecg + fecg, snr_db)
     
-    lengths = [x.size(-1) for x in mix]
-    mix_specs = stft.stft_batched(mix)
+    sum_spec = stft.stft_only(sum_).to('cuda')
+    sum_spec = sum_spec[:, :-1, :]  # drop last freq bin
+    sum_spec = sum_spec.unsqueeze(0)  # add batch dimension
+    sum_spec = sum_spec / 10.0
+    
     with torch.no_grad():
-        pred = model(mix_specs.to('cuda'))
-    pred = stft.istft_batched(pred.to('cpu'), lengths)
+        pred = model(sum_spec)[0]
     
-    print('mix', mix.shape, 'fecg', fecg.shape, 'pred', pred.shape)
+    pred = pred.detach().to('cpu')
+    pred = pred * 10.0
+    b, f, t = pred.shape
+    pred = torch.cat([pred, torch.zeros(b, 1, t, dtype=pred.dtype, device=pred.device)], dim=1)
+    pred = stft.istft_only(pred, length=1915).numpy()
     
     plt.figure(figsize=(12, 6))
-    plt.subplot(1, 3, 1)
-    plt.plot(mix[0][0].numpy())
-    plt.title('Mixed signal')
-    plt.subplot(1, 3, 2)
-    plt.plot(fecg[0][0].numpy())
-    plt.title('Fetal ECG')
-    plt.subplot(1, 3, 3)
-    plt.plot(pred[0][0].numpy())
-    plt.title('Predicted signal')
-    plt.savefig('results.png')
+    plt.plot(fecg[0], label='true')
+    plt.plot(pred[0], '--r', label='pred')
+    plt.legend()
+    plt.savefig('results/result.png')
+
+
+if __name__ == '__main__':
+    main()
+   
+    
+    
+    
     
        
 

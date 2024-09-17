@@ -1,6 +1,7 @@
 import click
 import torch
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
 from network import ComplexUNet
 from dataset import SignalDataset
@@ -13,8 +14,17 @@ class Trainer:
         self.max_epochs = max_epochs
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.best_model_fname = best_model_fname
-        
-        
+        self.history = {'train': [], 'test': []}
+    
+    
+    def draw_history(self):
+        plt.figure(figsize=(12, 6))
+        plt.plot(self.history['train'], label='train')
+        plt.plot(self.history['test'], label='test')
+        plt.legend()
+        plt.save(f'results/history_{self.best_model_fname}.png')
+    
+    
     def one_epoch(self, model, loader, train=True):
         model.train() if train else model.eval()
         total_loss = 0
@@ -29,10 +39,10 @@ class Trainer:
                 self.optimizer.step()
         return total_loss / len(loader)
                 
-                     
+          
 
     def train(self, model, loaders, epochs):
-        self.optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+        self.optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
         self.loss_fn = ComplexMSE()
         model = model.to(self.device)
         
@@ -46,8 +56,14 @@ class Trainer:
                 best_loss = test_loss
                 torch.save(model.state_dict(), self.best_model_fname)
                 text += ' | Model saved'
+            
+            # save history
+            self.history['train'].append(train_loss)
+            self.history['test'].append(test_loss)
         
             tqdm.write(text)
+            
+        self.draw_history()
 
 
 def get_loaders(dataset, batch_size, seed):
@@ -63,9 +79,9 @@ def get_loaders(dataset, batch_size, seed):
 
     
 @click.command()
-@click.option('-e', '--epochs', default=100, help='Number of epochs to train the model')
+@click.option('-e', '--epochs', default=5, help='Number of epochs to train the model')
 @click.option('-d', '--data', default='data/ecg', help='Path to the dataset')
-@click.option('-b', '--batch_size', default=32, help='Batch size for training')
+@click.option('-b', '--batch_size', default=16, help='Batch size for training')
 @click.option('-s', '--snr', default=20, help='Signal to noise ratio for the dataset')
 @click.option('-o', '--output', default='models/best.pth', help='Path to save the model')
 @click.option('--seed', default=42, help='Random seed')

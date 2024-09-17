@@ -53,10 +53,9 @@ class Diffuser():
         nb_samples = ecg.size(-1)
         ecg_plus_noise, noise_arr = self.add_noise(ecg, nb_samples, snr_db)
         return ecg_plus_noise
-    
-    
-if __name__ == '__main__':
-    
+
+
+def main():
     from iulia_old.prepare_data import add_noise as add_noise_old
     
     num_channels = 3
@@ -78,6 +77,9 @@ if __name__ == '__main__':
     print('noise_arr', noise_arr.max().item(), noise_arr_old.max())
     print('noise_arr', noise_arr.min().item(), noise_arr_old.min())
 
+
+if __name__ == '__main__':
+    main()
     
     
     

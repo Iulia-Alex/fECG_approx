@@ -88,11 +88,9 @@ class STFT():
             out.append(signal)
         return torch.stack(out)
     
-    
-    
 
-### Tests to check if the implementation is consistent with librosa
-if __name__ == '__main__':
+
+def main():  ## Tests to check if the implementation is consistent with librosa
     import numpy as np
     import librosa
 
@@ -148,4 +146,9 @@ if __name__ == '__main__':
     
     print(np.allclose(rec.numpy(), rec1, atol=1e-3))
     print(np.max(np.abs(rec.numpy() - rec1)))  # around e-8
+
+
+
+if __name__ == '__main__':
+    main()
     
