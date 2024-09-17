@@ -9,10 +9,21 @@ This branch is dedicated to the development of a fetal ECG approximation algorit
 
 ## Usage
 1. Clone the repository.
-2. Acquire the required dependencies, including packages and datasets. (TODO: Add requirements.txt)
+2. Acquire the required dependencies, including packages and datasets. See `env.yml` for the required packages.
 3. Run the `train.py` script to train the model.
 
 Disclaimer: Average time for an epoch on GTX 3060 is 2 minutes.
+
+## Next Steps
+- [ ] Try different architectures, including:
+    - [ ] A single kernel / diag for each layer.
+    - [ ] Concat instead of sum in residual connections.
+    - [ ] Multiple layers in each block.
+    - [ ] SE Complex Conv ?
+    - [ ] Complex attention ?
+
+- [ ] Add more activation functions.
+
 
 ## Contributors
 - [Iulia Orvas](https://github.com/Iulia-Alex)

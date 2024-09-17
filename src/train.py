@@ -3,28 +3,19 @@ import torch
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
+from fourier import STFT
+from logger import Logger
+from loss import ComplexMSE
 from network import ComplexUNet
 from dataset import SignalDataset
-from fourier import STFT
-from loss import ComplexMSE
 
 
 class Trainer:
-    def __init__(self, max_epochs, best_model_fname):
-        self.max_epochs = max_epochs
+    def __init__(self, best_model_fname, logfile):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.best_model_fname = best_model_fname
-        self.history = {'train': [], 'test': []}
-    
-    
-    def draw_history(self):
-        plt.figure(figsize=(12, 6))
-        plt.plot(self.history['train'], label='train')
-        plt.plot(self.history['test'], label='test')
-        plt.legend()
-        plt.save(f'results/history_{self.best_model_fname}.png')
-    
-    
+        self.logger = Logger(logfile)
+        
     def one_epoch(self, model, loader, train=True):
         model.train() if train else model.eval()
         total_loss = 0
@@ -42,35 +33,20 @@ class Trainer:
           
 
     def train(self, model, loaders, epochs):
+        self.logger.max_epochs = epochs
         self.optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
         self.loss_fn = ComplexMSE()
         model = model.to(self.device)
-        
-        best_loss = float('inf')
         for epoch in tqdm(range(epochs), desc='Epoch', leave=True):
             train_loss = self.one_epoch(model, loaders['train'])
             test_loss = self.one_epoch(model, loaders['test'], train=False)
-            
-            text = f'Epoch {epoch + 1}/{epochs} | Train loss: {train_loss:.4f} | Test loss: {test_loss:.4f}'
-            if test_loss < best_loss:
-                best_loss = test_loss
-                torch.save(model.state_dict(), self.best_model_fname)
-                text += ' | Model saved'
-            
-            # save history
-            self.history['train'].append(train_loss)
-            self.history['test'].append(test_loss)
-        
-            tqdm.write(text)
-            
-        self.draw_history()
+            self.logger.log(train_loss, test_loss, epoch, model, self.best_model_fname)
+        self.logger.draw_history()
 
 
 def get_loaders(dataset, batch_size, seed):
     random_gen = torch.Generator().manual_seed(seed)
-    test_size = int(0.1 * len(dataset))
-    train_size = len(dataset) - test_size
-    train_set, test_set = torch.utils.data.random_split(dataset, [train_size, test_size], generator=random_gen)
+    train_set, test_set = torch.utils.data.random_split(dataset, [0.9, 0.1], generator=random_gen)
     test_set.random_cut = False
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=10)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=10)
@@ -85,11 +61,12 @@ def get_loaders(dataset, batch_size, seed):
 @click.option('-s', '--snr', default=20, help='Signal to noise ratio for the dataset')
 @click.option('-o', '--output', default='models/best.pth', help='Path to save the model')
 @click.option('--seed', default=42, help='Random seed')
-def main(epochs, data, batch_size, snr, output, seed):
+@click.option('--logfile', default='results/log.txt', help='Path to save the log file')
+def main(epochs, data, batch_size, snr, output, seed, logfile):
     model = ComplexUNet(128 * 128)
     loaders = get_loaders(SignalDataset(data, snr_db=snr), batch_size, seed)
     
-    trainer = Trainer(epochs, output)
+    trainer = Trainer(output, logfile)
     trainer.train(model, loaders, epochs)
     
     

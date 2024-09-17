@@ -36,14 +36,13 @@ class Diffuser():
             white_fft = torch.abs(white_fft) / max(torch.abs(white_fft[num_samples_pink:num_samples_pink+num_samples_white]))
             mixture_fft = torch.abs(mixture_fft) / max(torch.abs(mixture_fft[num_samples_pink+num_samples_white:]))
             combined_fft = torch.zeros_like(pink_fft)
-            combined_fft += 2 * pink_fft + 0.2 * white_fft + 0.15 * mixture_fft
-            noise_timedomain = torch.fft.ifft(combined_fft)
+            combined_fft += 2.0 * pink_fft + 0.2 * white_fft + 0.15 * mixture_fft
+            noise_timedomain = torch.real(torch.fft.ifft(combined_fft))
             
             rms_signal = torch.sqrt(torch.mean(torch.square(ecg)))
-            rms_noise_exp = 10 ** (torch.log10(rms_signal) - snr_db / 20)
+            rms_noise_exp = 10.0 ** (torch.log10(rms_signal) - snr_db / 20.0)
             normalized_noise = (noise_timedomain - torch.mean(noise_timedomain)) / torch.std(noise_timedomain)
             new_noise = rms_noise_exp * normalized_noise
-            new_noise = torch.real(new_noise)
             ecg_plus_noise[:, i] += new_noise
             noise_arr[:, i] = new_noise
         return (ecg_plus_noise.T, noise_arr.T)

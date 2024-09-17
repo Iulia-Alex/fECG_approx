@@ -36,7 +36,8 @@ def load_mat(path):
 
 @click.command()
 @click.option('-m', '--model_path', type=str, default='models/best.pth')
-@click.option('-s', '--signal_path', type=str, default='data/ecg/fecgsyn01.mat')
+@click.option('-s', '--signal_path', type=str, default='data/ecg/fecgsyn23.mat')
+### examples of mat from test: 23, 542, 598, 616,
 @click.option('--snr_db', type=int, default=20)
 def main(model_path, signal_path, snr_db):
     model = get_model(model_path).to('cuda')
@@ -60,11 +61,16 @@ def main(model_path, signal_path, snr_db):
     pred = torch.cat([pred, torch.zeros(b, 1, t, dtype=pred.dtype, device=pred.device)], dim=1)
     pred = stft.istft_only(pred, length=1915).numpy()
     
-    plt.figure(figsize=(12, 6))
-    plt.plot(fecg[0], label='true')
-    plt.plot(pred[0], '--r', label='pred')
-    plt.legend()
+    fig, ax = plt.subplots(2, 2, figsize=(24, 12))
+    for i in range(4):
+        ax[i // 2, i % 2].plot(fecg[i], label='true')
+        ax[i // 2, i % 2].plot(pred[i], '--r', label='pred')
+        ax[i // 2, i % 2].legend(loc='upper right')
+        ax[i // 2, i % 2].set_title(f"Channel {i+1}")
+    plt.suptitle(f"Prediction for {signal_path.split('/')[-1]}", fontsize=16)
+    plt.tight_layout()
     plt.savefig('results/result.png')
+    plt.close()
 
 
 if __name__ == '__main__':
