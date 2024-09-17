@@ -1,18 +1,32 @@
 import torch
 import torch.nn as nn
 
-class ComplexReLU(nn.Module):
+
+class ComplexLayer(nn.Module):
+    """Wrapper for complex layers, with utility functions."""
+    def __init__(self):
+        super().__init__()
+        
+    def extract_real_imag(self, x):
+        return torch.real(x), torch.imag(x)
+    
+    def combine(self, real, imag):
+        return real + 1j * imag
+
+
+
+class ComplexReLU(ComplexLayer):
     def __init__(self):
         super().__init__()
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        x_real = torch.real(x)
-        x_imag = torch.imag(x)
-        return self.relu(x_real) + 1j * self.relu(x_imag)
+        x_real, x_imag = self.extract_real_imag(x)
+        x_real = self.relu(x_real)
+        x_imag = self.relu(x_imag)
+        return self.combine(x_real, x_imag)
 
-
-class ComplexConvLayer(nn.Module):
+class ComplexConvLayer(ComplexLayer):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=ComplexReLU):
         super().__init__()
         self.in_channels = in_channels
@@ -23,33 +37,22 @@ class ComplexConvLayer(nn.Module):
         self.activation = activation()
 
         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
-        # self.conv_imag = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
 
     def forward(self, x):
-        x_real = torch.real(x)
-        x_imag = torch.imag(x)
+        x_real, x_imag = self.extract_real_imag(x)
         x_real = self.conv(x_real)
         x_imag = self.conv(x_imag)
-        y = x_real + 1j * x_imag
-        u = self.activation(y)
+        u = self.activation(self.combine(x_real, x_imag))
         return u
 
 
-class Diag(nn.Module):
+class Diag(ComplexLayer):
     def __init__(self, dimension):
         super().__init__()
         self.betas = nn.Parameter(torch.ones(dimension))
 
     def forward(self, x):
-        x_real = torch.real(x)
-        x_imag = torch.imag(x)
-        # b, c, h, w = x_real.size()
-        # x_real = x_real.view(b * c, h * w)
-        # x_imag = x_imag.view(b * c, h * w)
-        # x = torch.cat([x_real, x_imag], dim=-1)
-        # print(x.shape)
-        # x = torch.complex(x, imag=torch.zeros_like(x)) @ torch.diag(torch.exp(1j * self.betas))
-        # print(x.shape)
+        x_real, x_imag = self.extract_real_imag(x)
         
         b, c, h, w = x_real.size()
         x_real = x_real.view(b * c, h * w)
@@ -60,46 +63,36 @@ class Diag(nn.Module):
         x_imag = x_imag @ torch.diag(torch.exp(self.betas))
         x_imag = x_imag.view(b, c, h, w)
         
-        x = x_real + 1j * x_imag
-        # x = x.view(b, c, h, w)
-        return x
+        return self.combine(x_real, x_imag)
 
 
-class ComplexDownSample(nn.Module):
+class ComplexDownSample(ComplexLayer):
     def __init__(self, scale_factor):
         super().__init__()
         self.scale_factor = scale_factor
         self.downsampler = nn.MaxPool2d(scale_factor)
         
     def forward(self, x):
-        x_real = torch.real(x)
-        x_imag = torch.imag(x)
-        
+        x_real, x_imag = self.extract_real_imag(x)
         x_real = self.downsampler(x_real)
         x_imag = self.downsampler(x_imag)
-        
-        x = x_real + 1j * x_imag
-        return x
+        return self.combine(x_real, x_imag)
     
     
-class ComplexUpSample(nn.Module):
+class ComplexUpSample(ComplexLayer):
     def __init__(self, scale_factor):
         super().__init__()
         self.scale_factor = scale_factor
         self.upsampler = nn.Upsample(scale_factor=scale_factor, mode='nearest')
         
     def forward(self, x):
-        x_real = torch.real(x)
-        x_imag = torch.imag(x)
-        
+        x_real, x_imag = self.extract_real_imag(x)
         x_real = self.upsampler(x_real)
         x_imag = self.upsampler(x_imag)
-        
-        x = x_real + 1j * x_imag
-        return x
+        return self.combine(x_real, x_imag)
 
 
-class ComplexDownBlock(nn.Module):
+class ComplexDownBlock(ComplexLayer):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=ComplexReLU, scale_factor=2):
         super().__init__()
         self.conv = ComplexConvLayer(in_channels, out_channels, kernel_size, stride, padding, activation)
@@ -109,7 +102,7 @@ class ComplexDownBlock(nn.Module):
         return self.down(self.conv(x))
 
 
-class ComplexUpBlock(nn.Module):
+class ComplexUpBlock(ComplexLayer):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=ComplexReLU, scale_factor=2):
         super().__init__()
         self.conv = ComplexConvLayer(in_channels, out_channels, kernel_size, stride, padding, activation)
@@ -173,18 +166,3 @@ if __name__ == '__main__':
     
     y = model(x)
     print('output:', y.size())
-
-# if __name__ == "__main__":
-#     batch_size = 32
-#     in_channels = 4
-#     out_channels = 4
-#     height, width = 128, 128
-#     x = torch.randn(batch_size, in_channels, height, width)
-
-#     d = Diag(height * width)
-#     y = d(x)
-#     print(y.shape)
-
-    # lin = nn.Linear(16, 32)
-    # w = lin.weight
-    # print(w.shape)
