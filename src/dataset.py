@@ -74,7 +74,8 @@ def main():
         text += f'imag: [{fecg.imag.min().item():.2f}, {fecg.imag.max().item():.2f}]'
         print(text)
         
-        break
+        if i == 5:
+            break
 
     
     

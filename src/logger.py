@@ -1,18 +1,19 @@
 import os
 import torch
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 from datetime import datetime as dt
 
 
 class Logger:
-    def __init__(self, log_path):
+    def __init__(self, log_path=None):
         self.log_path = log_path
-        log_folder = os.path.dirname(log_path)
-        if not os.path.exists(log_folder):
-            os.makedirs(log_folder)
-
-        with open(log_path, 'w') as f:
-            f.write('')
+        if log_path is not None:
+            log_folder = os.path.dirname(log_path)
+            if not os.path.exists(log_folder):
+                os.makedirs(log_folder)
+            with open(log_path, 'w') as f:
+                f.write('')
         
         self.get_time = lambda: dt.now()
         self.current_time = self.get_time()
@@ -30,15 +31,25 @@ class Logger:
         plt.legend()
         plt.savefig(f'results/history_{self.best_model_fname}.png')
         plt.close()
+        
     
+    def draw_from_file(self, path):
+        raise NotImplementedError('This method is not implemented yet')
+        
+
+    def __check_log_path(self):
+        if self.log_path is None:
+            raise ValueError('[ERROR] Log path is not defined, please set the log_path attribute')
 
     def log_info(self, msg):
+        self.__check_log_path()
         with open(self.log_path, 'a') as f:
             f.write(msg + '\n')
         tqdm.write(msg)
         
         
     def log(self, train_loss, test_loss, epoch, model, save_path):
+        self.__check_log_path()
         text = f'[Epoch {epoch + 1}/{self.max_epochs} ]\n'
         text += f'\tTrain loss: {train_loss:.3e}\n'
         text += f'\tTest loss: {test_loss:.3e}\n'
@@ -53,3 +64,13 @@ class Logger:
         self.history['train'].append(train_loss)
         self.history['test'].append(test_loss)
         self.log_info(text)
+        
+
+
+# TODO: Implement the main function, which will be used to draw from the log file
+def main():
+    pass
+
+
+if __name__ == '__main__':
+    main()

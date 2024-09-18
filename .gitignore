@@ -1,5 +1,7 @@
 data
 iulia_old
 results
+logs
 *.pyc
 *.pth
+*.log

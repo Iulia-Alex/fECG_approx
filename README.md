@@ -12,7 +12,7 @@ This branch is dedicated to the development of a fetal ECG approximation algorit
 2. Acquire the required dependencies, including packages and datasets. See `env.yml` for the required packages.
 3. Run the `train.py` script to train the model.
 
-Disclaimer: Average time for an epoch on GTX 3060 is 2 minutes.
+Disclaimer: Average time for an epoch on GTX 3060 is 10 minutes.
 
 ## Next Steps
 - [ ] Try different architectures, including:
