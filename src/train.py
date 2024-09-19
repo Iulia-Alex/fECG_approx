@@ -36,7 +36,7 @@ class Trainer:
         self.optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-4)
         self.loss_fn = ComplexMSE()
         model = model.to(self.device)
-        for epoch in tqdm(range(epochs), desc='Epoch', leave=True):
+        for epoch in tqdm(range(epochs), desc='Epoch', leave=False):
             train_loss = self.one_epoch(model, loaders['train'])
             test_loss = self.one_epoch(model, loaders['test'], train=False)
             self.logger.log(train_loss, test_loss, epoch, model, self.best_model_fname)

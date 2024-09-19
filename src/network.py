@@ -200,16 +200,16 @@ class ComplexUNet(nn.Module):
         self.down1 = ComplexDownBlock(64, 128, sameW=sameW)
         self.down2 = ComplexDownBlock(128, 256, sameW=sameW)
         self.down3 = ComplexDownBlock(256, 512, sameW=sameW)
-
+        
         self.bottleneck = nn.Sequential(
-            ComplexDownBlock(512, 1024, sameW=sameW),
+            ComplexConvLayer(512, 1024, sameW=sameW),
             ComplexConvLayer(1024, 1024, sameW=sameW),
+            ComplexConvLayer(1024, 512, sameW=sameW),
         )
 
-        self.up1 = ComplexUpBlock(1024, 512, sameW=sameW)
-        self.up2 = ComplexUpBlock(512, 256, sameW=sameW)
-        self.up3 = ComplexUpBlock(256, 128, sameW=sameW)
-        self.up4 = ComplexUpBlock(128, 64, sameW=sameW)
+        self.up1 = ComplexUpBlock(1024, 256, sameW=sameW)
+        self.up2 = ComplexUpBlock(512, 128, sameW=sameW)
+        self.up3 = ComplexUpBlock(256, 64, sameW=sameW)
         
         self.conv2 = ComplexConvLayer(64, 64, sameW=sameW)
         self.conv3 = ComplexConvLayer(64, 4, kernel_size=1, padding=0, sameW=sameW)
@@ -224,13 +224,12 @@ class ComplexUNet(nn.Module):
         res1 = self.down1(x)
         res2 = self.down2(res1)
         res3 = self.down3(res2)
-
+        
         x = self.bottleneck(res3)
 
-        x = self.up1(x) + res3
-        x = self.up2(x) + res2
-        x = self.up3(x) + res1
-        x = self.up4(x)
+        x = self.up1(torch.cat([x, res3], dim=1))
+        x = self.up2(torch.cat([x, res2], dim=1))
+        x = self.up3(torch.cat([x, res1], dim=1))
         x = self.conv2(x)
         x = self.conv3(x)
 
@@ -243,7 +242,7 @@ class ComplexUNet(nn.Module):
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    b, c, h, w = 32, 4, 128, 128
+    b, c, h, w = 16, 4, 128, 128
     x = torch.randn(b, c, h, w) + 1j * torch.randn(b, c, h, w)
     x = x.to(device)
 

@@ -12,13 +12,13 @@ from network import ComplexUNet
 from diffuser import Diffuser
 
 def get_model(path, sizes=(128, 128)):
-    model = ComplexUNet(sizes[0] * sizes[1])
+    model = ComplexUNet(sizes[0] * sizes[1], sameW=True)
     model.load_state_dict(torch.load(path, weights_only=True))
     model.eval()
     return model
 
 
-def load_mat(path):
+def load_mat(path, random=False):
     data = loadmat(path)
     mecg = data['out']['mecg'][0][0].astype(float)
     fecg = data['out']['fecg'][0][0].astype(float)
@@ -27,7 +27,10 @@ def load_mat(path):
     mecg = resampler(torch.tensor(mecg, dtype=torch.float32))
     fecg = resampler(torch.tensor(fecg, dtype=torch.float32))
     
-    random_start = torch.randint(0, mecg.size(-1) - 1915, (1,))
+    if random:
+        random_start = torch.randint(0, len(mecg) - 1915, (1,)).item()
+    else:
+        random_start = 42 * 500
     mecg = mecg[:, random_start:random_start+1915]
     fecg = fecg[:, random_start:random_start+1915]
     
@@ -39,7 +42,8 @@ def load_mat(path):
 @click.option('-s', '--signal_path', type=str, default='data/ecg/fecgsyn23.mat')
 ### examples of mat from test: 23, 542, 598, 616,
 @click.option('--snr_db', type=int, default=20)
-def main(model_path, signal_path, snr_db):
+@click.option('-o', '--output_path', type=str, default='results/result.png')
+def main(model_path, signal_path, snr_db, output_path):
     model = get_model(model_path).to('cuda')
     stft = STFT()
     diffuser = Diffuser(4, 500)
@@ -69,7 +73,7 @@ def main(model_path, signal_path, snr_db):
         ax[i // 2, i % 2].set_title(f"Channel {i+1}")
     plt.suptitle(f"Prediction for {signal_path.split('/')[-1]}", fontsize=16)
     plt.tight_layout()
-    plt.savefig('results/result.png')
+    plt.savefig(output_path)
     plt.close()
 
 

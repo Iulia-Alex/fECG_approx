@@ -16,9 +16,9 @@ Disclaimer: Average time for an epoch on GTX 3060 is 10 minutes.
 
 ## Next Steps
 - [ ] Try different architectures, including:
-    - [ ] A single kernel / diag for each layer.
-    - [ ] Concat instead of sum in residual connections.
-    - [ ] Multiple layers in each block.
+    - [x] ~~A single kernel / diag for each layer.~~ Controled by the `sameW` parameter.
+    - [x] ~~Multiple layers in each block.~~ Only concat left and we get the UNet.
+    - [x] ~~Concat instead of sum in residual connections.~~ Full UNet now.
     - [ ] SE Complex Conv ?
     - [ ] Complex attention ?
 
