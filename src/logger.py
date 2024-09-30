@@ -48,11 +48,14 @@ class Logger:
         tqdm.write(msg)
         
         
-    def log(self, train_loss, test_loss, epoch, model, save_path):
+    def log(self, loss, metrics, epoch, model, save_path):
+        train_loss, test_loss = loss['train'], loss['test']
+        metrics_train, metrics_test = metrics['train'], metrics['test']
+        
         self.__check_log_path()
         text = f'[Epoch {epoch + 1}/{self.max_epochs} ]\n'
-        text += f'\tTrain loss: {train_loss:.3e}\n'
-        text += f'\tTest loss: {test_loss:.3e}\n'
+        text += f'\tTrain: loss: {train_loss:.3e} | prd: {metrics_train["prd"]:.3f}\n'
+        text += f'\tTest: loss: {test_loss:.3e} | prd: {metrics_test["prd"]:.3f}\n'
         if test_loss < self.best_loss:
             self.best_loss = test_loss
             torch.save(model.state_dict(), save_path)

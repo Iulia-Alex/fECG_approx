@@ -2,21 +2,22 @@ import os
 import torch
 import torchaudio
 from scipy.io import loadmat
+from tqdm import tqdm
 
 from diffuser import Diffuser
-from fourier import STFT
 
 
 class SignalDataset(torch.utils.data.Dataset):
-    def __init__(self, folder, seconds_per_sample=3.83, channels=4, snr_db=10):
+    def __init__(self, folder, seconds_per_sample=3.83, snr_db=10, stft=None, debug=False):
         self.files = self.__get_files(folder)
         resample_fn = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
         self.samples = int(seconds_per_sample * 500)
-        self.diffuser = Diffuser(num_channels=channels, sample_rate=500)
+        self.diffuser = Diffuser(sample_rate=500)
         self.transform = lambda x: self.__get_random_samples(resample_fn(torch.tensor(x, dtype=torch.float32) / torch.tensor(x).abs().max()))
         self.snr_db = snr_db
         self.random_cut = True
-        self.stft = STFT()
+        self.stft = stft
+        self.debug = debug
         
 
     def __len__(self):
@@ -41,15 +42,23 @@ class SignalDataset(torch.utils.data.Dataset):
         fname = self.files[idx]
         data = loadmat(fname)
         mecg = self.transform(data['out']['mecg'][0][0].astype(float))  # maternal ECG
-        fecg = self.transform(data['out']['fecg'][0][0].astype(float))  # fetal ECG    
+        fecg = self.transform(data['out']['fecg'][0][0].astype(float))  # fetal ECG
+        
         sum_ = self.diffuser(mecg + fecg, self.snr_db)  # might vary the SNR
-        fecg = self.stft.stft_only(fecg)
+        fecg = self.stft.stft(fecg)
         fecg = fecg[:, :-1, :]  # drop last freq bin  
-        sum_ = self.stft.stft_only(sum_)
+        sum_ = self.stft.stft(sum_)
         sum_ = sum_[:, :-1, :]  # drop last freq bin
         
-        sum_ = sum_ / 10.0  # scale as close to [-1, 1]
-        fecg = fecg / 10.0
+        sum_ = sum_ / self.stft.amplify_factor
+        fecg = fecg / self.stft.amplify_factor
+        
+        if torch.isnan(sum_).any() or torch.isnan(fecg).any():
+            print('Nan values found')
+            print(fname)
+            print(sum_.min(), sum_.max())
+            print(fecg.min(), fecg.max())
+            raise ValueError('Nan values found')
         
         return sum_, fecg
     

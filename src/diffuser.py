@@ -3,8 +3,7 @@ import colorednoise as cn
 
 
 class Diffuser():
-    def __init__(self, num_channels, sample_rate, beta=1):
-        self.num_channels = num_channels
+    def __init__(self, sample_rate, beta=1):
         self.sample_rate = sample_rate
         self.beta = beta
 
@@ -17,7 +16,9 @@ class Diffuser():
     def add_noise(self, ecg, nb_samples, snr_db):
         ecg_plus_noise = ecg.clone().detach().T
         noise_arr = torch.empty(ecg_plus_noise.shape)
-        for i in range(self.num_channels):
+        num_channels = ecg.size(0)
+       
+        for i in range(num_channels):
             
             pink_noise = torch.tensor(cn.powerlaw_psd_gaussian(self.beta, nb_samples))
             white_noise = torch.randn(nb_samples)

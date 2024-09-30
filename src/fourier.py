@@ -3,15 +3,16 @@ import torchaudio
 
 
 class STFT():
-    def __init__(self, nfft=256, win_len=100, hop_len=15):
+    def __init__(self, nfft=256, win_len=100, hop_len=15, amplify_factor=1):
         super().__init__()
         self.nfft = nfft
         self.hoplen = hop_len
         self.win_len = win_len
         self.window = torch.hann_window(win_len)
+        self.amplify_factor = amplify_factor
 
   
-    def stft_only(self, signal):
+    def stft(self, signal):
         return torch.stft(
             signal, 
             n_fft=self.nfft, 
@@ -23,7 +24,7 @@ class STFT():
             return_complex=True
         )
         
-    def istft_only(self, spec, length=None):
+    def istft(self, spec, length=None):
         return torch.istft(
             spec,
             n_fft=self.nfft, 
@@ -33,64 +34,30 @@ class STFT():
             center=True,
             length=length
         )
-    
-    def stft(self, signal):
-        spec = self.stft_only(signal)
-        
-        ref = torch.max(torch.abs(spec))
-        spec_db = torchaudio.functional.amplitude_to_DB(
-            torch.abs(spec), 
-            multiplier=20, 
-            amin=1e-05, 
-            db_multiplier=torch.log10(ref),
-            top_db=80
-        )
-        phase = torch.angle(spec)
-        
-        # drop last freq bin
-        spec_db = spec_db[:, :-1]
-        phase = phase[:, :-1]
-        
-        spec_db = (spec_db + 80) / 80  # scale to [0, 1]
-        return spec_db, phase, ref
-    
-        
-    def istft(self, spec_db, phase=None, length=None, ref=1):
-        spec_db = spec_db * 80 - 80  # scale to [-80, 0]
-
-        # add last freq bin
-        b, f, t = spec_db.shape
-        spec_db = torch.cat([spec_db, torch.zeros(b, 1, t, dtype=spec_db.dtype, device=spec_db.device)], dim=1)
-
-        spec = torchaudio.functional.DB_to_amplitude(spec_db, ref=ref, power=0.5)
-        if phase is not None:
-            phase = torch.cat([phase, torch.zeros(b, 1, t, dtype=phase.dtype, device=phase.device)], dim=1)
-            spec = spec * torch.exp(1j * phase)
-        
-        signal = self.istft_only(spec, length=length)
-        return signal
         
     
-    def stft_batched(self, signals):
-        specs, phases, refs = [], [], []
-        for signal in signals:
-            spec, phase, ref = self.stft(signal)
-            specs.append(spec)
-            phases.append(phase)
-            refs.append(ref)
-        return torch.stack(specs), torch.stack(phases), torch.stack(refs)
+    # def stft_batched(self, x):
+    #     b, c, t = x.shape
+    #     device = x.device
+    #     stfts = [self.stft(x[i]) / self.amplify_factor for i in range(b)]
+    #     stfts = torch.stack(stfts, dim=0)
+    #     stfts = stfts[..., :-1, :]  # drop last freq bin
+    #     stfts = stfts.to(device)
+    #     return stfts
     
-    
-    def istft_batched(self, specs, phases, refs, lengths):
-        out = []
-        for spec, length in zip(specs, lengths):
-            signal = self.istft(spec, length=length)
-            out.append(signal)
-        return torch.stack(out)
+    def istft_batched(self, x):
+        b, c, f, t = x.shape
+        device = x.device
+        x = torch.cat([x, torch.zeros(b, c, 1, t, dtype=x.dtype, device=x.device)], dim=-2)
+        x = x.to('cpu')
+        signals = [self.istft(x[i] * self.amplify_factor) for i in range(b)]
+        signals = torch.stack(signals, dim=0)
+        signals = signals.to(device)
+        return signals
     
 
 
-def main():  ## Tests to check if the implementation is consistent with librosa
+def test_implementation():  ## Tests to check if the implementation is consistent with librosa
     import numpy as np
     import librosa
 
@@ -146,6 +113,19 @@ def main():  ## Tests to check if the implementation is consistent with librosa
     
     print(np.allclose(rec.numpy(), rec1, atol=1e-3))
     print(np.max(np.abs(rec.numpy() - rec1)))  # around e-8
+
+
+
+def main():
+    x = torch.randn(32, int(3.83 * 500))
+    x /= torch.max(torch.abs(x))
+    nfft = 256
+    win_len = 100
+    hop_len = 15
+    stft = STFT(nfft=nfft, win_len=win_len, hop_len=hop_len)
+    
+    spec = stft.stft(x)
+    print(spec.shape)
 
 
 

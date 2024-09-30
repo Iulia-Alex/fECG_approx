@@ -51,6 +51,8 @@ class ComplexConvLayer(ComplexLayer):
             self.conv = nn.Conv2d(
                 in_channels, out_channels, kernel_size, stride, padding
             )
+            self.norm = nn.BatchNorm2d(out_channels)
+            
         else:
             self.conv_real = nn.Conv2d(
                 in_channels, out_channels, kernel_size, stride, padding
@@ -58,15 +60,22 @@ class ComplexConvLayer(ComplexLayer):
             self.conv_imag = nn.Conv2d(
                 in_channels, out_channels, kernel_size, stride, padding
             )
+            self.norm_real = nn.BatchNorm2d(out_channels)
+            self.norm_imag = nn.BatchNorm2d(out_channels)
+            
 
     def forward(self, x):
         x_real, x_imag = self.extract_real_imag(x)
         if self.sameW:
             x_real = self.conv(x_real)
+            x_real = self.norm(x_real)
             x_imag = self.conv(x_imag)
+            x_imag = self.norm(x_imag)
         else:
             x_real = self.conv_real(x_real)
+            x_real = self.norm_real(x_real)
             x_imag = self.conv_imag(x_imag)
+            x_imag = self.norm_imag(x_imag)
         u = self.activation(self.combine(x_real, x_imag))
         return u
 
@@ -86,8 +95,8 @@ class Diag(ComplexLayer):
         x_real, x_imag = self.extract_real_imag(x)
 
         b, c, h, w = x_real.size()
-        x_real = x_real.contiguous().view(b * c, h * w)
-        x_imag = x_imag.contiguous().view(b * c, h * w)
+        x_real = x_real.view(b * c, h * w)
+        x_imag = x_imag.view(b * c, h * w)
 
         if self.sameW:
             x_real = x_real @ torch.diag(torch.exp(self.betas))
@@ -96,8 +105,8 @@ class Diag(ComplexLayer):
             x_real = x_real @ torch.diag(torch.exp(self.betas_real))
             x_imag = x_imag @ torch.diag(torch.exp(self.betas_imag))
 
-        x_real = x_real.contiguous().view(b, c, h, w)
-        x_imag = x_imag.contiguous().view(b, c, h, w)
+        x_real = x_real.view(b, c, h, w)
+        x_imag = x_imag.view(b, c, h, w)
 
         return self.combine(x_real, x_imag)
 
@@ -193,7 +202,7 @@ class ComplexUpBlock(ComplexLayer):
 class ComplexUNet(nn.Module):
     def __init__(self, dimension, sameW=False):
         super().__init__()
-        self.diag1 = Diag(dimension, sameW=sameW)
+        # self.diag1 = Diag(dimension, sameW=sameW)
         self.conv1 = ComplexConvLayer(4, 64, sameW=sameW)
         
         
@@ -213,13 +222,26 @@ class ComplexUNet(nn.Module):
         
         self.conv2 = ComplexConvLayer(64, 64, sameW=sameW)
         self.conv3 = ComplexConvLayer(64, 4, kernel_size=1, padding=0, sameW=sameW)
-        self.out = Diag(dimension, sameW=sameW)
-        self.sigma = nn.Tanh()
+        # self.out = Diag(dimension, sameW=sameW)
+        self.sigma = nn.Sigmoid()
+
+
+    def normalize(self, x):
+        mean = x.mean(dim=(1, 2, 3), keepdim=True)
+        std = x.std(dim=(1, 2, 3), keepdim=True)
+        self.mean = mean
+        self.std = std
+        return (x - mean) / (std + 1e-6)
+
+    def denormalize(self, x):
+        return x * self.std + self.mean
 
 
     def forward(self, x):
         init = x
-        x = self.diag1(x)
+        x = self.normalize(x)
+        
+        # x = self.diag1(x)
         x = self.conv1(x)
         res1 = self.down1(x)
         res2 = self.down2(res1)
@@ -233,10 +255,13 @@ class ComplexUNet(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
 
-        x = self.out(x)
+        # x = self.out(x)
         x = self.sigma(x)
         x = init * x
+        
+        x = self.denormalize(x)
         return x
+
 
 
 if __name__ == "__main__":
