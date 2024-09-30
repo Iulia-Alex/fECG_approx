@@ -22,9 +22,9 @@ class SpectrogramDataset(Dataset):
         current_mat = self.files[idx]
         ### procesare, scoate spect
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        data_path = os.path.join(current_dir, "ecg")
-        spect_dir = os.path.join(current_dir, "data/processed/spectrogram")
-        input_spec, output_spec, input_phase, output_phase, _ = create_spectrogram(data_path, idx)
+        data_path = os.path.join("../Licenta/unet", "ecg")
+        random_start = np.random.randint(0, 56)
+        input_spec, output_spec, input_phase, output_phase, _ = create_spectrogram(data_path, idx, random_start=random_start)
         input_spec = input_spec * np.exp(1j * input_phase)
         output_spec = output_spec * np.exp(1j * output_phase)
         input_spec.view(dtype=np.complex64)

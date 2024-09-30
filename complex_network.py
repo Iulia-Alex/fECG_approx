@@ -16,6 +16,12 @@ class ComplexReLU(nn.Module):
         x_imag = torch.imag(x)
         return self.relu(x_real) + 1j * self.relu(x_imag)
 
+class Activation1(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x):
+        return 0
 
 class ComplexConvLayer(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=ComplexReLU):
@@ -163,22 +169,22 @@ class ComplexUNet(nn.Module):
         
 
 
-# if __name__ == '__main__':
-#     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+if __name__ == '__main__':
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     
-#     b, c, h, w = 32, 4, 128, 128
-#     x = torch.randn(b, c, h, w) + 1j * torch.randn(b, c, h, w)
-#     x = x.to(device)
+    b, c, h, w = 32, 4, 128, 128
+    x = torch.randn(b, c, h, w) + 1j * torch.randn(b, c, h, w)
+    x = x.to(device)
 
     
-#     model = ComplexUNet(h * w)
-#     model = model.to(device)
+    model = ComplexUNet(h * w)
+    model = model.to(device)
     
-#     params = sum(p.numel() for p in model.parameters())
-#     print(f'Number of parameters: {params / 1e6:.2f} M')
+    params = sum(p.numel() for p in model.parameters())
+    print(f'Number of parameters: {params / 1e6:.2f} M')
     
-#     y = model(x)
-#     print('output:', y.size())
+    y = model(x)
+    print('output:', y.size())
 
 # if __name__ == "__main__":
 #     batch_size = 32

@@ -109,6 +109,8 @@ def create_spectrogram(load_path, index, test=False, phase = 'Fetal', random_sta
     mecg, fecg, sum_ = load_and_resample(mat, old_sr, sr)
     if test:
         random_start = 5000
+    else:
+        random_start *= sr
 
     mecg = shorten(mecg, sr, random_start)
     fecg = shorten(fecg, sr, random_start)
