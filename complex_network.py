@@ -49,7 +49,7 @@ class Activation5(nn.Module):
         super().__init__()
     
     def forward(self, x):
-        return 8 / (3 * torch.sqrt(3)) * x / (1 + torch.abs(x)**2)
+        return 8 / (3 * torch.sqrt(torch.tensor(3))) * x / (1 + torch.abs(x)**2)
     
 class Activation6(nn.Module):
     def __init__(self):
@@ -59,7 +59,7 @@ class Activation6(nn.Module):
         return x / (1 + torch.abs(x)**2)
 
 class ComplexConvLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation1):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation5):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -146,7 +146,7 @@ class ComplexUpSample(nn.Module):
 
 
 class ComplexDownBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation1, scale_factor=2):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation5, scale_factor=2):
         super().__init__()
         self.conv = ComplexConvLayer(in_channels, out_channels, kernel_size, stride, padding, activation)
         self.down = ComplexDownSample(scale_factor)
@@ -156,7 +156,7 @@ class ComplexDownBlock(nn.Module):
 
 
 class ComplexUpBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation1, scale_factor=2):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation5, scale_factor=2):
         super().__init__()
         self.conv = ComplexConvLayer(in_channels, out_channels, kernel_size, stride, padding, activation)
         self.up = ComplexUpSample(scale_factor)
