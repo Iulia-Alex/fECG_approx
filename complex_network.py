@@ -21,10 +21,45 @@ class Activation1(nn.Module):
         super().__init__()
     
     def forward(self, x):
-        return 0
+        return x / (1 + torch.abs(x))
+
+class Activation2(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x):
+        return x / torch.sqrt(1 + torch.abs(x)**2)
+
+class Activation3(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x):
+        return 0 if x == 0 else torch.tanh(torch.abs(x)) / torch.abs(x) * x
+    
+class Activation4(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x):
+        return 10 * x / 11 * (1 + torch.exp((-1) * torch.abs(x)))
+    
+class Activation5(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x):
+        return 8 / (3 * torch.sqrt(3)) * x / (1 + torch.abs(x)**2)
+    
+class Activation6(nn.Module):
+    def __init__(self):
+        super().__init__()
+    
+    def forward(self, x):
+        return x / (1 + torch.abs(x)**2)
 
 class ComplexConvLayer(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=ComplexReLU):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation1):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -111,7 +146,7 @@ class ComplexUpSample(nn.Module):
 
 
 class ComplexDownBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=ComplexReLU, scale_factor=2):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation1, scale_factor=2):
         super().__init__()
         self.conv = ComplexConvLayer(in_channels, out_channels, kernel_size, stride, padding, activation)
         self.down = ComplexDownSample(scale_factor)
@@ -121,7 +156,7 @@ class ComplexDownBlock(nn.Module):
 
 
 class ComplexUpBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=ComplexReLU, scale_factor=2):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1, activation=Activation1, scale_factor=2):
         super().__init__()
         self.conv = ComplexConvLayer(in_channels, out_channels, kernel_size, stride, padding, activation)
         self.up = ComplexUpSample(scale_factor)
