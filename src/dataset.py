@@ -13,7 +13,7 @@ class SignalDataset(torch.utils.data.Dataset):
         resample_fn = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
         self.samples = int(seconds_per_sample * 500)
         self.diffuser = Diffuser(sample_rate=500)
-        self.transform = lambda x: self.__get_random_samples(resample_fn(torch.tensor(x, dtype=torch.float32) / torch.tensor(x).abs().max()))
+        self.transform = lambda x: self.__get_random_samples(resample_fn(torch.tensor(x, dtype=torch.float32)))
         self.snr_db = snr_db
         self.random_cut = True
         self.stft = stft

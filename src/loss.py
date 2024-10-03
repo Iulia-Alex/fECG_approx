@@ -45,11 +45,12 @@ class SignalMSE(CustomLoss):
         super().__init__()
         self.stft = stft
         
-    def forward(self, y_true, y_pred):
+    def forward(self, y_true, y_pred, signal=False):
         self.check_input(y_pred)
-        y_true_signal = self.stft.istft_batched(y_true)
-        y_pred_signal = self.stft.istft_batched(y_pred)
-        mse = torch.nn.functional.mse_loss(y_true_signal, y_pred_signal, reduction='mean')
+        if not signal:
+            y_true = self.stft.istft_batched(y_true)
+            y_pred = self.stft.istft_batched(y_pred)
+        mse = torch.nn.functional.mse_loss(y_true, y_pred, reduction='mean')
         mse = self.compute_loss_val(mse)
         return mse
     
@@ -59,11 +60,12 @@ class SignalMAE(CustomLoss):
         super().__init__()
         self.stft = stft
         
-    def forward(self, y_true, y_pred):
+    def forward(self, y_true, y_pred, signal=False):
         self.check_input(y_pred)
-        y_true_signal = self.stft.istft_batched(y_true)
-        y_pred_signal = self.stft.istft_batched(y_pred)
-        mae = torch.nn.functional.l1_loss(y_true_signal, y_pred_signal, reduction='none')
+        if not signal:
+            y_true = self.stft.istft_batched(y_true)
+            y_pred = self.stft.istft_batched(y_pred)
+        mae = torch.nn.functional.l1_loss(y_true, y_pred, reduction='none')
         mae = self.compute_loss_val(mae)
         return mae
     

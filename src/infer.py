@@ -11,9 +11,10 @@ from fourier import STFT
 from network import ComplexUNet
 from diffuser import Diffuser
 
-def get_model(path, sizes=(128, 128)):
-    model = ComplexUNet(sizes[0] * sizes[1], sameW=True)
-    model.load_state_dict(torch.load(path, weights_only=True))
+
+def get_model(path, sizes, sameW, activation, diag):
+    model = ComplexUNet(sizes[0] * sizes[1], sameW=sameW, activation=activation, diag=diag)
+    model.load_state_dict(torch.load(path))
     model.eval()
     return model
 
@@ -24,8 +25,12 @@ def load_mat(path, random=False):
     fecg = data['out']['fecg'][0][0].astype(float)
     
     resampler = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
-    mecg = resampler(torch.tensor(mecg, dtype=torch.float32))
-    fecg = resampler(torch.tensor(fecg, dtype=torch.float32))
+    mecg = torch.tensor(mecg, dtype=torch.float32)
+    fecg = torch.tensor(fecg, dtype=torch.float32)
+    # mecg = mecg / mecg.abs().max()
+    # fecg = fecg / fecg.abs().max()
+    mecg = resampler(mecg)
+    fecg = resampler(fecg)
     
     if random:
         random_start = torch.randint(0, len(mecg) - 1915, (1,)).item()
@@ -41,29 +46,31 @@ def load_mat(path, random=False):
 @click.option('-m', '--model_path', type=str, default='models/best.pth')
 @click.option('-s', '--signal_path', type=str, default='data/ecg/fecgsyn23.mat')
 ### examples of mat from test: 23, 542, 598, 616,
-@click.option('--snr_db', type=int, default=20)
+@click.option('--snr_db', type=int, default=5)
 @click.option('-o', '--output_path', type=str, default='results/result.png')
 def main(model_path, signal_path, snr_db, output_path):
-    model = get_model(model_path).to('cuda')
+    model = get_model(model_path, sizes=(128, 128), sameW=False, activation='crelu', diag=False)
+    model = model.to('cuda:1')
     stft = STFT()
-    diffuser = Diffuser(4, 500)
+    diffuser = Diffuser(500)
     
     mecg, fecg = load_mat(signal_path)
     sum_ = diffuser(mecg + fecg, snr_db)
+    # sum_[:, 0] = 1.0
     
-    sum_spec = stft.stft_only(sum_).to('cuda')
+    sum_spec = stft.stft(sum_).to('cuda:1')
     sum_spec = sum_spec[:, :-1, :]  # drop last freq bin
     sum_spec = sum_spec.unsqueeze(0)  # add batch dimension
-    sum_spec = sum_spec / 10.0
+    # sum_spec = sum_spec / 10.0
     
     with torch.no_grad():
         pred = model(sum_spec)[0]
     
     pred = pred.detach().to('cpu')
-    pred = pred * 10.0
+    # pred = pred * 10.0
     b, f, t = pred.shape
     pred = torch.cat([pred, torch.zeros(b, 1, t, dtype=pred.dtype, device=pred.device)], dim=1)
-    pred = stft.istft_only(pred, length=1915).numpy()
+    pred = stft.istft(pred, length=1915).numpy()
     
     fig, ax = plt.subplots(2, 2, figsize=(24, 12))
     for i in range(4):
@@ -71,7 +78,7 @@ def main(model_path, signal_path, snr_db, output_path):
         ax[i // 2, i % 2].plot(pred[i], '--r', label='pred')
         ax[i // 2, i % 2].legend(loc='upper right')
         ax[i // 2, i % 2].set_title(f"Channel {i+1}")
-    plt.suptitle(f"Prediction for {signal_path.split('/')[-1]}", fontsize=16)
+    plt.suptitle(f"Prediction for {signal_path}", fontsize=16)
     plt.tight_layout()
     plt.savefig(output_path)
     plt.close()

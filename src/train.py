@@ -54,7 +54,7 @@ class Trainer:
 
     def train(self, model, loaders, epochs):
         self.logger.max_epochs = epochs
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
         self.loss_fn = SignalMAE(loaders['stft'])
         self.metrics = PDR(loaders['stft'])
         model = model.to(self.device)
@@ -84,13 +84,14 @@ class Trainer:
 def main(epochs, data, test_data, batch_size, snr, output, amplify, seed, logfile, debug):
     
     model = ComplexUNet(128 * 128, sameW=False)
+    model.load_weights('models/best_v2_noDatasetNorm_addDiag.pth')
     
     stft = STFT(amplify_factor=amplify)
     
     train_set = SignalDataset(data, snr_db=snr, stft=stft)
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=8)
     test_set = SignalDataset(test_data, snr_db=snr, stft=stft)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
     loaders = {'train': train_loader, 'test': test_loader, 'stft': stft}
     
     trainer = Trainer(output, logfile, debug)

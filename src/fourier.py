@@ -3,7 +3,7 @@ import torchaudio
 
 
 class STFT():
-    def __init__(self, nfft=256, win_len=100, hop_len=15, amplify_factor=1):
+    def __init__(self, nfft=256, win_len=100, hop_len=15, amplify_factor=1.0):
         super().__init__()
         self.nfft = nfft
         self.hoplen = hop_len

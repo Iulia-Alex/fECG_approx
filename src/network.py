@@ -27,6 +27,23 @@ class ComplexReLU(ComplexLayer):
         return self.combine(x_real, x_imag)
 
 
+class GKActivation(ComplexLayer):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return x / (1 + torch.abs(x))
+
+
+class SquashActivation(ComplexLayer):
+    def __init__(self):
+        super().__init__()
+        self.c = 8.0 / (3.0 * torch.sqrt(torch.tensor(3.0)))
+
+    def forward(self, x):
+        return self.c * (x / (1 + torch.abs(x) ** 2))
+
+
 class ComplexConvLayer(ComplexLayer):
     def __init__(
         self,
@@ -35,7 +52,7 @@ class ComplexConvLayer(ComplexLayer):
         kernel_size=3,
         stride=1,
         padding=1,
-        activation=ComplexReLU,
+        activation=SquashActivation,
         sameW=False,
     ):
         super().__init__()
@@ -145,7 +162,7 @@ class ComplexDownBlock(ComplexLayer):
         kernel_size=3,
         stride=1,
         padding=1,
-        activation=ComplexReLU,
+        activation=SquashActivation,
         scale_factor=2,
         sameW=False,
     ):
@@ -176,7 +193,7 @@ class ComplexUpBlock(ComplexLayer):
         kernel_size=3,
         stride=1,
         padding=1,
-        activation=ComplexReLU,
+        activation=SquashActivation,
         scale_factor=2,
         sameW=False,
     ):
@@ -200,30 +217,46 @@ class ComplexUpBlock(ComplexLayer):
 
 
 class ComplexUNet(nn.Module):
-    def __init__(self, dimension, sameW=False):
+    def __init__(self, dimension, sameW=False, activation='crelu', diag=False):
         super().__init__()
-        # self.diag1 = Diag(dimension, sameW=sameW)
-        self.conv1 = ComplexConvLayer(4, 64, sameW=sameW)
+        
+        match activation:
+            case 'crelu': self.act = ComplexReLU
+            case 'gk': self.act = GKActivation
+            case 'squash': self.act = SquashActivation
+            case _: raise ValueError(f"Unknown activation: {activation}")
+    
+        self.diag = diag
+        if diag:
+            self.diag_in = Diag(dimension, sameW=sameW)
+            self.diag_out = Diag(dimension, sameW=sameW)
+        
+        self.conv1 = ComplexConvLayer(4, 64, sameW=sameW, activation=self.act)
         
         
-        self.down1 = ComplexDownBlock(64, 128, sameW=sameW)
-        self.down2 = ComplexDownBlock(128, 256, sameW=sameW)
-        self.down3 = ComplexDownBlock(256, 512, sameW=sameW)
+        self.down1 = ComplexDownBlock(64, 128, sameW=sameW, activation=self.act)
+        self.down2 = ComplexDownBlock(128, 256, sameW=sameW, activation=self.act)
+        self.down3 = ComplexDownBlock(256, 512, sameW=sameW, activation=self.act)
         
         self.bottleneck = nn.Sequential(
-            ComplexConvLayer(512, 1024, sameW=sameW),
-            ComplexConvLayer(1024, 1024, sameW=sameW),
-            ComplexConvLayer(1024, 512, sameW=sameW),
+            ComplexConvLayer(512, 1024, sameW=sameW, activation=self.act),
+            ComplexConvLayer(1024, 1024, sameW=sameW, activation=self.act),
+            ComplexConvLayer(1024, 512, sameW=sameW, activation=self.act),
         )
 
-        self.up1 = ComplexUpBlock(1024, 256, sameW=sameW)
-        self.up2 = ComplexUpBlock(512, 128, sameW=sameW)
-        self.up3 = ComplexUpBlock(256, 64, sameW=sameW)
+        self.up1 = ComplexUpBlock(1024, 256, sameW=sameW, activation=self.act)
+        self.up2 = ComplexUpBlock(512, 128, sameW=sameW, activation=self.act)
+        self.up3 = ComplexUpBlock(256, 64, sameW=sameW, activation=self.act)
         
-        self.conv2 = ComplexConvLayer(64, 64, sameW=sameW)
-        self.conv3 = ComplexConvLayer(64, 4, kernel_size=1, padding=0, sameW=sameW)
-        # self.out = Diag(dimension, sameW=sameW)
+        self.conv2 = ComplexConvLayer(64, 64, sameW=sameW, activation=self.act)
+        self.conv3 = ComplexConvLayer(64, 4, kernel_size=1, padding=0, sameW=sameW, activation=self.act)
         self.sigma = nn.Sigmoid()
+
+        self.out = torch.nn.Sequential(
+            ComplexConvLayer(8, 4, sameW=sameW, activation=self.act),
+            ComplexConvLayer(4, 4, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
+            ComplexConvLayer(4, 4, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
+        )
 
 
     def normalize(self, x):
@@ -233,6 +266,7 @@ class ComplexUNet(nn.Module):
         self.std = std
         return (x - mean) / (std + 1e-6)
 
+
     def denormalize(self, x):
         return x * self.std + self.mean
 
@@ -240,7 +274,9 @@ class ComplexUNet(nn.Module):
     def forward(self, x):
         init = x
         x = self.normalize(x)
-        
+
+        if self.diag: x = self.diag_in(x)
+
         # x = self.diag1(x)
         x = self.conv1(x)
         res1 = self.down1(x)
@@ -255,13 +291,27 @@ class ComplexUNet(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
 
-        # x = self.out(x)
-        x = self.sigma(x)
-        x = init * x
-        
+        x = self.out(torch.cat([init, x], dim=1))
+        if self.diag: x = self.diag_out(x)
         x = self.denormalize(x)
         return x
 
+    # custom weights initialization
+    def load_weights(self, path):
+        w = torch.load(path)
+        for name, param in self.named_parameters():
+            if name in w:
+                param.data = w[name]
+
+
+    def freeze_all_except_diag(self):
+        for name, param in self.named_parameters():
+            if "diag" not in name:
+                param.requires_grad = False
+
+    def unfreeze_all(self):
+        for name, param in self.named_parameters():
+            param.requires_grad = True
 
 
 if __name__ == "__main__":
