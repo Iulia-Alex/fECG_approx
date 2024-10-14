@@ -43,30 +43,8 @@ class SquashActivation(ComplexLayer):
     def forward(self, x):
         return self.c * (x / (1 + torch.abs(x) ** 2))
     
+
 class SmeqActivation(ComplexLayer):
-    def __init__(self, x):
-        super().__init__()
-        self.real_part = torch.min(torch.real(x), torch.imag(x))
-        self.imag_part = torch.max(torch.real(x), torch.imag(x))
-    
-    def forward(self):
-        return self.real_part + 1j * self.imag_part
-
-class ConvexCombinationActivation(nn.Module):
-    def __init__(self, mu1, mu2, mu3):
-        super().__init__()
-        assert mu1 + mu2 + mu3 == 1, "sum must be 1"
-        self.mu1 = mu1
-        self.mu2 = mu2
-        self.mu3 = mu3
-        self.crelu = ComplexReLU()
-        self.gk = GKActivation()
-        self.smeq = SmeqActivation()
-
-    def forward(self, x):
-        return self.mu1 * self.crelu(x) + self.mu2 * self.gk(x) + self.mu3 * self.smeq(x)
-
-class TauUpActivation(ComplexLayer):
     def __init__(self):
         super().__init__()
         
@@ -83,11 +61,11 @@ class RoActivation(ComplexLayer):
         self.mu_logits = torch.nn.Parameter(torch.randn(3))
         self.CReLU = ComplexReLU()
         self.GK = GKActivation()
-        self.TauUp = TauUpActivation()
+        self.Smeq = SmeqActivation()
         
     def forward(self, x):
         mu = torch.nn.functional.softmax(self.mu_logits, dim=0)
-        x = mu[0] * self.CReLU(x) + mu[1] * self.GK(x) + mu[2] * self.TauUp(x)
+        x = mu[0] * self.CReLU(x) + mu[1] * self.GK(x) + mu[2] * self.Smeq(x)
         return x
 
 
