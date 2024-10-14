@@ -6,7 +6,7 @@ from datetime import datetime as dt
 
 
 class Logger:
-    def __init__(self, log_path=None):
+    def __init__(self, log_path=None, best_model_fname=None):
         self.log_path = log_path
         if log_path is not None:
             log_folder = os.path.dirname(log_path)
@@ -18,6 +18,10 @@ class Logger:
         self.get_time = lambda: dt.now()
         self.current_time = self.get_time()
         
+        if best_model_fname is not None:
+            self.best_model_fname = best_model_fname
+        else:
+            self.best_model_fname = 'best_model'
         self.best_loss = float('inf')
         self.history = {'train': [], 'test': []}
 
@@ -47,12 +51,23 @@ class Logger:
             f.write(msg + '\n')
         tqdm.write(msg)
         
-        
+
+    def __log_model(self, model):    
+        with open(self.log_path, 'a') as f:
+            metadata = model.metadata
+            f.write('Model metadata:\n')
+            for key, value in metadata.items():
+                f.write(f'{key}: {value}\n')
+            f.write('\n')
+
     def log(self, loss, metrics, epoch, model, save_path):
         train_loss, test_loss = loss['train'], loss['test']
         metrics_train, metrics_test = metrics['train'], metrics['test']
-        
         self.__check_log_path()
+        
+        if epoch == 0:
+            self.__log_model(model)
+        
         text = f'[Epoch {epoch + 1}/{self.max_epochs} ]\n'
         text += f'\tTrain: loss: {train_loss:.3e} | prd: {metrics_train["prd"]:.3f}\n'
         text += f'\tTest: loss: {test_loss:.3e} | prd: {metrics_test["prd"]:.3f}\n'

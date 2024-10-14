@@ -1,3 +1,4 @@
+import os
 import click
 import torch
 import torchaudio
@@ -14,7 +15,7 @@ from diffuser import Diffuser
 
 def get_model(path, sizes, sameW, activation, diag):
     model = ComplexUNet(sizes[0] * sizes[1], sameW=sameW, activation=activation, diag=diag)
-    model.load_state_dict(torch.load(path))
+    model.load_state_dict(torch.load(path, weights_only=True))
     model.eval()
     return model
 
@@ -44,15 +45,18 @@ def load_mat(path, random=False):
 
 @click.command()
 @click.option('-m', '--model_path', type=str, default='models/best.pth')
-@click.option('-s', '--signal_path', type=str, default='data/ecg/fecgsyn23.mat')
+@click.option('-s', '--signal_path', type=str, default='data/test_ecg2')
 ### examples of mat from test: 23, 542, 598, 616,
 @click.option('--snr_db', type=int, default=5)
-@click.option('-o', '--output_path', type=str, default='results/result.png')
-def main(model_path, signal_path, snr_db, output_path):
+@click.option('-i', '--index', type=int, default=1)
+def main(model_path, signal_path, snr_db, index):
     model = get_model(model_path, sizes=(128, 128), sameW=False, activation='crelu', diag=False)
     model = model.to('cuda:1')
     stft = STFT()
     diffuser = Diffuser(500)
+    
+    index = str(index).zfill(2)
+    signal_path = os.path.join(signal_path, f'fecgsyn{index}.mat')
     
     mecg, fecg = load_mat(signal_path)
     sum_ = diffuser(mecg + fecg, snr_db)
@@ -80,6 +84,8 @@ def main(model_path, signal_path, snr_db, output_path):
         ax[i // 2, i % 2].set_title(f"Channel {i+1}")
     plt.suptitle(f"Prediction for {signal_path}", fontsize=16)
     plt.tight_layout()
+    
+    output_path = f'results/result_{index}.png'
     plt.savefig(output_path)
     plt.close()
 

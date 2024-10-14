@@ -44,6 +44,31 @@ class SquashActivation(ComplexLayer):
         return self.c * (x / (1 + torch.abs(x) ** 2))
 
 
+class TauUpActivation(ComplexLayer):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, x):
+        real_x, imag_x = self.extract_real_imag(x)
+        min_ = torch.min(real_x, imag_x)
+        max_ = torch.max(real_x, imag_x)
+        return self.combine(min_, max_)
+        
+
+class RoActivation(ComplexLayer):
+    def __init__(self):
+        super().__init__()
+        self.mu_logits = torch.nn.Parameter(torch.randn(3))
+        self.CReLU = ComplexReLU()
+        self.GK = GKActivation()
+        self.TauUp = TauUpActivation()
+        
+    def forward(self, x):
+        mu = torch.nn.functional.softmax(self.mu_logits, dim=0)
+        x = mu[0] * self.CReLU(x) + mu[1] * self.GK(x) + mu[2] * self.TauUp(x)
+        return x
+
+
 class ComplexConvLayer(ComplexLayer):
     def __init__(
         self,
@@ -224,14 +249,22 @@ class ComplexUNet(nn.Module):
             case 'crelu': self.act = ComplexReLU
             case 'gk': self.act = GKActivation
             case 'squash': self.act = SquashActivation
+            case 'ro': self.act = RoActivation
             case _: raise ValueError(f"Unknown activation: {activation}")
     
+        self.metadata = {
+            'dimension': dimension,
+            'sameW': sameW,
+            'activation': activation,
+            'diag': diag,
+        }
+        
         self.diag = diag
         if diag:
             self.diag_in = Diag(dimension, sameW=sameW)
             self.diag_out = Diag(dimension, sameW=sameW)
         
-        self.conv1 = ComplexConvLayer(4, 64, sameW=sameW, activation=self.act)
+        self.conv1 = ComplexConvLayer(1, 64, sameW=sameW, activation=self.act)
         
         
         self.down1 = ComplexDownBlock(64, 128, sameW=sameW, activation=self.act)
@@ -249,13 +282,13 @@ class ComplexUNet(nn.Module):
         self.up3 = ComplexUpBlock(256, 64, sameW=sameW, activation=self.act)
         
         self.conv2 = ComplexConvLayer(64, 64, sameW=sameW, activation=self.act)
-        self.conv3 = ComplexConvLayer(64, 4, kernel_size=1, padding=0, sameW=sameW, activation=self.act)
+        self.conv3 = ComplexConvLayer(64, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act)
         self.sigma = nn.Sigmoid()
 
         self.out = torch.nn.Sequential(
-            ComplexConvLayer(8, 4, sameW=sameW, activation=self.act),
-            ComplexConvLayer(4, 4, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
-            ComplexConvLayer(4, 4, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
+            ComplexConvLayer(2, 1, sameW=sameW, activation=self.act),
+            ComplexConvLayer(1, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
+            ComplexConvLayer(1, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
         )
 
 
@@ -272,12 +305,15 @@ class ComplexUNet(nn.Module):
 
 
     def forward(self, x):
+        b, c, h, w = x.size()
+        x = x.view(b * c, 1, h, w)
+        
         init = x
         x = self.normalize(x)
 
-        if self.diag: x = self.diag_in(x)
+        if self.diag: 
+            x = self.diag_in(x)
 
-        # x = self.diag1(x)
         x = self.conv1(x)
         res1 = self.down1(x)
         res2 = self.down2(res1)
@@ -292,8 +328,11 @@ class ComplexUNet(nn.Module):
         x = self.conv3(x)
 
         x = self.out(torch.cat([init, x], dim=1))
-        if self.diag: x = self.diag_out(x)
+        if self.diag: 
+            x = self.diag_out(x)
+            
         x = self.denormalize(x)
+        x = x.view(b, c, h, w)
         return x
 
     # custom weights initialization
@@ -301,13 +340,17 @@ class ComplexUNet(nn.Module):
         w = torch.load(path)
         for name, param in self.named_parameters():
             if name in w:
-                param.data = w[name]
+                if param.data.size() == w[name].size():
+                    param.data = w[name]
 
 
-    def freeze_all_except_diag(self):
+    def freeze_all_except_firs_last(self):
         for name, param in self.named_parameters():
-            if "diag" not in name:
+            if "conv1" in name or "out" in name:
+                param.requires_grad = True
+            else:
                 param.requires_grad = False
+        
 
     def unfreeze_all(self):
         for name, param in self.named_parameters():
@@ -317,11 +360,11 @@ class ComplexUNet(nn.Module):
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    b, c, h, w = 16, 4, 128, 128
+    b, c, h, w = 1, 4, 128, 128
     x = torch.randn(b, c, h, w) + 1j * torch.randn(b, c, h, w)
     x = x.to(device)
 
-    model = ComplexUNet(h * w, sameW=True)
+    model = ComplexUNet(h * w, sameW=True, activation='ro', diag=True)
     model = model.to(device)
 
     params = sum(p.numel() for p in model.parameters())
@@ -329,3 +372,6 @@ if __name__ == "__main__":
 
     y = model(x)
     print("output:", y.size())
+
+    metadata = model.metadata
+    print(metadata)

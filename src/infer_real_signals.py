@@ -68,10 +68,10 @@ if __name__ == '__main__':
     # model_path = 'models/BEST_unet_norm_nodiag_diffW_snr5.pth'
     # model_path = 'models/unet_norm_nodiag_diffW_snr5.pth'
     model_path = 'models/best_v2_noDatasetNorm.pth'
-    signals_path = 'data/test_ecg'
+    signals_path = 'data/test_ecg2'
     snr_db = 5
     
-    model = get_model(model_path).to('cuda')
+    model = get_model(model_path).to('cuda:1')
     diffuser = Diffuser(500)
     stft = STFT()
     loss_fn = SignalMSE(stft)
@@ -97,7 +97,7 @@ if __name__ == '__main__':
         # batches = batches / 10.0
         
         with torch.no_grad():
-            pred = model(batches.to('cuda'))
+            pred = model(batches.to('cuda:1'))
             
         pred = pred.cpu()
         # pred = pred * 10.0
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         }
         
         save_path = signal_path.replace('test_ecg', 'predicted_ecg')
-        savemat(save_path, signals)
+        # savemat(save_path, signals)
     
     
     mse_list = torch.tensor(mse_list)

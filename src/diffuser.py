@@ -50,6 +50,10 @@ class Diffuser():
     
     
     def __call__(self, ecg, snr_db=10):
+        snr_db_min = 5
+        snr_db_max = 20
+        
+        snr_db = snr_db_min + (snr_db_max - snr_db_min) * torch.rand(1).item()
         nb_samples = ecg.size(-1)
         ecg_plus_noise, noise_arr = self.add_noise(ecg, nb_samples, snr_db)
         return ecg_plus_noise
