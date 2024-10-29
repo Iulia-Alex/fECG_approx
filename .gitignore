@@ -2,6 +2,9 @@ data
 iulia_old
 results
 logs
+tests
 *.pyc
 *.pth
 *.log
+*.png
+*.jpg

@@ -17,18 +17,18 @@ from loss import SignalMSE
 
 
 def get_model(path, sizes=(128, 128)):
-    model = ComplexUNet(sizes[0] * sizes[1], sameW=False)
+    model = ComplexUNet(sizes[0] * sizes[1], sameW=False, activation='ro', diag=True)
     model.load_state_dict(torch.load(path, weights_only=True))
     model.eval()
     return model
 
+resampler = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
 
 def load_mat(path, random=False):
     data = loadmat(path)
     mecg = data['out']['mecg'][0][0].astype(float)
     fecg = data['out']['fecg'][0][0].astype(float)
-        
-    resampler = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
+
     mecg = resampler(torch.tensor(mecg, dtype=torch.float32))
     fecg = resampler(torch.tensor(fecg, dtype=torch.float32))
     return mecg, fecg
@@ -67,19 +67,24 @@ if __name__ == '__main__':
     # model_path = 'models/unet_sameW_snr15.pth'
     # model_path = 'models/BEST_unet_norm_nodiag_diffW_snr5.pth'
     # model_path = 'models/unet_norm_nodiag_diffW_snr5.pth'
-    model_path = 'models/best_v2_noDatasetNorm.pth'
-    signals_path = 'data/test_ecg2'
-    snr_db = 5
-    
-    model = get_model(model_path).to('cuda:1')
-    diffuser = Diffuser(500)
+    # model_path = 'models/best_v2_noDatasetNorm.pth'
+    # model_path = 'models/best_before_ro.pth'
+    model_path = 'models/best_ro.pth'
+
+    signals_path = 'data/test_ecg'
+    snr_db = 20
+    save_signals_path = f'results/predicted_ecg_{snr_db}db'
+    device = 'cuda:0'
+
+    model = get_model(model_path).to(device)
+    diffuser = Diffuser(500, snr_db=snr_db)
     stft = STFT()
     loss_fn = SignalMSE(stft)
     metric_fn = PDR(stft)
     
     
     files = os.listdir(signals_path)
-    # files = ['fecgsyn01.mat']
+    os.makedirs(save_signals_path, exist_ok=True)
     
     cnt_nans = 0
     mse_list = []
@@ -89,18 +94,19 @@ if __name__ == '__main__':
     
         mecg, fecg = load_mat(signal_path)
         sum_ = mecg + fecg
-        sum_ = diffuser(sum_, snr_db)
+        sum_ = diffuser(sum_)
         # sum_ = sum_ / sum_.abs().max()
-        
-        
+
         batches = create_batches_from_signal(sum_, stft)
-        # batches = batches / 10.0
+        pred_batches = []
         
-        with torch.no_grad():
-            pred = model(batches.to('cuda:1'))
+        for batch in batches:
+            batch = batch.unsqueeze(0).to(device)
+            with torch.no_grad():
+                pred = model(batch)
+            pred_batches.append(pred)
             
-        pred = pred.cpu()
-        # pred = pred * 10.0
+        pred = torch.cat(pred_batches, dim=0).to('cpu')
         
         signal_pred = create_signal_from_batches(pred, stft, sum_.shape[-1])
         
@@ -108,6 +114,7 @@ if __name__ == '__main__':
         pdr = metric_fn(fecg, signal_pred, signal=True)
         mse_list.append(mse)
         pdr_list.append(pdr['prd'])
+        tqdm.write(f'File: {file}, MSE: {mse}, PDR: {pdr["prd"]}')
 
         # compute the nans in the signal
         num_nans = torch.isnan(signal_pred).sum().item()
@@ -124,10 +131,9 @@ if __name__ == '__main__':
             'noisy_signal': sum_.numpy()
         }
         
-        save_path = signal_path.replace('test_ecg', 'predicted_ecg')
-        # savemat(save_path, signals)
-    
-    
+        save_path = os.path.join(save_signals_path, file)
+        savemat(save_path, signals)
+
     mse_list = torch.tensor(mse_list)
     pdr_list = torch.tensor(pdr_list)
     

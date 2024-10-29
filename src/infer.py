@@ -20,18 +20,21 @@ def get_model(path, sizes, sameW, activation, diag):
     return model
 
 
+resampler = torchaudio.transforms.Resample(orig_freq=1000, new_freq=500)
+
+
 def load_mat(path, random=False):
     data = loadmat(path)
-    mecg = data['out']['mecg'][0][0].astype(float)
-    fecg = data['out']['fecg'][0][0].astype(float)
+    # mecg = data['out']['mecg'][0][0].astype(float)
+    # fecg = data['out']['fecg'][0][0].astype(float)
+    mecgs = data['ecg'].astype(float)
     
-    resampler = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
     mecg = torch.tensor(mecg, dtype=torch.float32)
-    fecg = torch.tensor(fecg, dtype=torch.float32)
+    # fecg = torch.tensor(fecg, dtype=torch.float32)
     # mecg = mecg / mecg.abs().max()
     # fecg = fecg / fecg.abs().max()
     mecg = resampler(mecg)
-    fecg = resampler(fecg)
+    # fecg = resampler(fecg)
     
     if random:
         random_start = torch.randint(0, len(mecg) - 1915, (1,)).item()
@@ -50,17 +53,19 @@ def load_mat(path, random=False):
 @click.option('--snr_db', type=int, default=5)
 @click.option('-i', '--index', type=int, default=1)
 def main(model_path, signal_path, snr_db, index):
-    model = get_model(model_path, sizes=(128, 128), sameW=False, activation='crelu', diag=False)
+    model = get_model(model_path, sizes=(128, 128), sameW=False, activation='ro', diag=True)
     model = model.to('cuda:1')
     stft = STFT()
-    diffuser = Diffuser(500)
+    # diffuser = Diffuser(500)
     
     index = str(index).zfill(2)
-    signal_path = os.path.join(signal_path, f'fecgsyn{index}.mat')
+    # signal_path = os.path.join(signal_path, f'fecgsyn{index}.mat')
+    signal_path = os.path.join(signal_path, f'a{index}.mat')
     
-    mecg, fecg = load_mat(signal_path)
-    sum_ = diffuser(mecg + fecg, snr_db)
-    # sum_[:, 0] = 1.0
+    # mecg, fecg = load_mat(signal_path)
+    # sum_ = diffuser(mecg + fecg, snr_db)
+    sum_, _ = load_mat(signal_path, random=True)
+    
     
     sum_spec = stft.stft(sum_).to('cuda:1')
     sum_spec = sum_spec[:, :-1, :]  # drop last freq bin

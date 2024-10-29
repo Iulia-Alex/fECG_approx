@@ -3,9 +3,15 @@ import colorednoise as cn
 
 
 class Diffuser():
-    def __init__(self, sample_rate, beta=1):
+    def __init__(self, sample_rate, beta=1, snr_db=[5, 20]):
         self.sample_rate = sample_rate
         self.beta = beta
+        
+        assert type(snr_db) in [int, float, list, tuple], 'snr_db should be a list or tuple, int or float'
+        if type(snr_db) in [int, float]:
+            snr_db = [snr_db, snr_db]
+        assert len(snr_db) == 2, 'snr_db should have 2 elements, min and max'
+        self.snr_db = snr_db
 
     def mixtgauss(self, N, p, sigma0, sigma1):
         q = torch.randn(N)
@@ -49,10 +55,8 @@ class Diffuser():
         return (ecg_plus_noise.T, noise_arr.T)
     
     
-    def __call__(self, ecg, snr_db=10):
-        snr_db_min = 5
-        snr_db_max = 20
-        
+    def __call__(self, ecg):
+        snr_db_min, snr_db_max = self.snr_db
         snr_db = snr_db_min + (snr_db_max - snr_db_min) * torch.rand(1).item()
         nb_samples = ecg.size(-1)
         ecg_plus_noise, noise_arr = self.add_noise(ecg, nb_samples, snr_db)
