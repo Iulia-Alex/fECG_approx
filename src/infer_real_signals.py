@@ -10,21 +10,18 @@ import seaborn as sns
 sns.set_style('darkgrid')
 
 from fourier import STFT
-from network import ComplexUNet
+from network import create_model
 from diffuser import Diffuser
 from metrics import PDR
 from loss import SignalMSE
 
-
-def get_model(path, sizes=(128, 128)):
-    model = ComplexUNet(sizes[0] * sizes[1], sameW=False, activation='ro', diag=True)
-    model.load_state_dict(torch.load(path, weights_only=True))
-    model.eval()
-    return model
-
-resampler = torchaudio.transforms.Resample(orig_freq=2500, new_freq=500)
+  
 
 def load_mat(path, random=False):
+    orig_sr = 2500
+    new_sr = 500
+    resampler = torchaudio.transforms.Resample(orig_sr, new_sr)
+    
     data = loadmat(path)
     mecg = data['out']['mecg'][0][0].astype(float)
     fecg = data['out']['fecg'][0][0].astype(float)
@@ -32,6 +29,49 @@ def load_mat(path, random=False):
     mecg = resampler(torch.tensor(mecg, dtype=torch.float32))
     fecg = resampler(torch.tensor(fecg, dtype=torch.float32))
     return mecg, fecg
+
+
+def replace_nans(signal):
+    nans = torch.isnan(signal)
+    nans_idx = torch.where(nans)[0]
+    for i in nans_idx:
+        if i == 0:
+            signal[i] = signal[i+1] if not torch.isnan(signal[i+1]) else 0
+        else :
+            signal[i] = signal[i-1]
+    return signal
+
+
+def load_mat_physio(path):
+    orig_sr = 1000
+    new_sr = 500
+    resampler = torchaudio.transforms.Resample(orig_sr, new_sr)
+    
+    data = loadmat(path)
+    ecg = data['ecg'].astype(float)
+    ecg = torch.tensor(ecg, dtype=torch.float32).T
+    for i in range(ecg.shape[0]):
+        ecg[i] = replace_nans(ecg[i])
+    real_peaks = data['peaks'].astype(int)
+    real_peaks = list(real_peaks[0])
+    ecg = resampler(torch.tensor(ecg, dtype=torch.float32))
+    real_peaks = [int(p * (new_sr / orig_sr)) for p in real_peaks]
+    real_peaks = torch.tensor(real_peaks, dtype=torch.long)
+    return ecg, real_peaks
+
+
+def load_mat_iulia(path, size=1915):
+    orig_sr = 2500
+    new_sr = 500
+    resampler = torchaudio.transforms.Resample(orig_sr, new_sr)
+    
+    data = loadmat(path)
+    signal = data['s'].astype(float)
+    signal = torch.tensor(signal, dtype=torch.float32)
+    signal = signal.view(1, -1)
+    signal = resampler(signal)
+    return signal[:, :size]
+
 
 
 def create_batches_from_signal(signal, stft, samples_size=1915, overlap=0.5):
@@ -64,26 +104,28 @@ def create_signal_from_batches(specs, stft, original_size, samples_size=1915, ov
 
 
 if __name__ == '__main__':
-    # model_path = 'models/unet_sameW_snr15.pth'
-    # model_path = 'models/BEST_unet_norm_nodiag_diffW_snr5.pth'
-    # model_path = 'models/unet_norm_nodiag_diffW_snr5.pth'
-    # model_path = 'models/best_v2_noDatasetNorm.pth'
-    # model_path = 'models/best_before_ro.pth'
-    model_path = 'models/best_ro.pth'
+    
+    signals_path = 'data/test_ecg2'
+    signals_path = 'data/iulia_test_files'
+    save_signals_path = f'results/iulia_test_files'
+    
+    snr_db = [5, 20]
+    
+    device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
+    device = torch.device(device)
 
-    signals_path = 'data/test_ecg'
-    snr_db = 20
-    save_signals_path = f'results/predicted_ecg_{snr_db}db'
-    device = 'cuda:0'
-
-    model = get_model(model_path).to(device)
+    ckpt_path = 'models/latest_model_metadata.pth'
+    model = create_model(ckpt_path)
+    model = model.to(device)
+    model = model.eval()
+    
     diffuser = Diffuser(500, snr_db=snr_db)
     stft = STFT()
     loss_fn = SignalMSE(stft)
     metric_fn = PDR(stft)
     
     
-    files = os.listdir(signals_path)
+    files = sorted(os.listdir(signals_path))
     os.makedirs(save_signals_path, exist_ok=True)
     
     cnt_nans = 0
@@ -92,10 +134,11 @@ if __name__ == '__main__':
     for file in tqdm(files):
         signal_path = os.path.join(signals_path, file)
     
-        mecg, fecg = load_mat(signal_path)
-        sum_ = mecg + fecg
-        sum_ = diffuser(sum_)
-        # sum_ = sum_ / sum_.abs().max()
+        # mecg, fecg = load_mat(signal_path)
+        # sum_ = mecg + fecg
+        # sum_ = diffuser(sum_)
+        # sum_, peaks = load_mat_physio(signal_path)
+        sum_ = load_mat_iulia(signal_path)
 
         batches = create_batches_from_signal(sum_, stft)
         pred_batches = []
@@ -110,14 +153,15 @@ if __name__ == '__main__':
         
         signal_pred = create_signal_from_batches(pred, stft, sum_.shape[-1])
         
-        mse = loss_fn(fecg, signal_pred, signal=True).item()
-        pdr = metric_fn(fecg, signal_pred, signal=True)
-        mse_list.append(mse)
-        pdr_list.append(pdr['prd'])
-        tqdm.write(f'File: {file}, MSE: {mse}, PDR: {pdr["prd"]}')
+        # mse = loss_fn(fecg, signal_pred, signal=True).item()
+        # pdr = metric_fn(fecg, signal_pred, signal=True)
+        # mse_list.append(mse)
+        # pdr_list.append(pdr['prd'])
+        # tqdm.write(f'File: {file}, MSE: {mse}, PDR: {pdr["prd"]}')
+        tqdm.write(f"File: {file} done!")
 
         # compute the nans in the signal
-        num_nans = torch.isnan(signal_pred).sum().item()
+        num_nans = torch.isnan(sum_).sum().item()
         if num_nans > 0:
             tqdm.write(f'Found {num_nans} nans in the signal {file}')
             cnt_nans += 1
@@ -125,14 +169,18 @@ if __name__ == '__main__':
 
         
         signals = {
-            'original_fecg': fecg.numpy(),
-            'original_mecg': mecg.numpy(),
+            # 'original_fecg': fecg.numpy(),
+            # 'original_mecg': mecg.numpy(),
             'predicted_fecg': signal_pred.numpy(),
-            'noisy_signal': sum_.numpy()
+            'noisy_signal': sum_.numpy(),
+            # 'peaks': peaks.numpy()
         }
         
         save_path = os.path.join(save_signals_path, file)
         savemat(save_path, signals)
+        # tqdm.write(f'Saved {save_path} with {signal_pred.shape[-1]} samples, MSE: {mse}, PDR: {pdr["prd"]}')
+        # tqdm.write(f'Saved {save_path} with {signal_pred.shape[-1]} samples and {peaks.shape[0]} peaks')
+
 
     mse_list = torch.tensor(mse_list)
     pdr_list = torch.tensor(pdr_list)

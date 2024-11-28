@@ -73,7 +73,8 @@ class Logger:
         text += f'\tTest: loss: {test_loss:.3e} | prd: {metrics_test["prd"]:.3f}\n'
         if test_loss < self.best_loss:
             self.best_loss = test_loss
-            torch.save(model.state_dict(), save_path)
+            pack = {'state_dict': model.state_dict(), 'metadata': model.metadata}
+            torch.save(pack, save_path)
             text += '\tModel saved\n'
         elapsed_time = self.get_time() - self.current_time
         self.current_time = self.get_time()
@@ -87,7 +88,7 @@ class Logger:
 
 # TODO: Implement the main function, which will be used to draw from the log file
 def main():
-    pass
+    raise NotImplementedError('This function is not implemented yet')
 
 
 if __name__ == '__main__':

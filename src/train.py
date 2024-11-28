@@ -6,13 +6,13 @@ from logger import Logger
 from loss import ComposedLoss, SignalMSE, SignalMAE
 from fourier import STFT
 from metrics import PDR
-from network import ComplexUNet
+from network import create_model
 from dataset import SignalDataset
 
 
 class Trainer:
     def __init__(self, best_model_fname, logfile, debug=False):
-        self.device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.best_model_fname = best_model_fname
         self.logger = Logger(logfile, best_model_fname)
         self.debug = debug
@@ -54,22 +54,21 @@ class Trainer:
 
     def train(self, model, loaders, epochs):
         self.logger.max_epochs = epochs
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
         self.loss_fn = SignalMAE(loaders['stft'])
         self.metrics = PDR(loaders['stft'])
         model = model.to(self.device)
+                
         for epoch in tqdm(range(epochs), leave=False, bar_format='Epoch: {l_bar}{bar:10}{r_bar}{bar:-10b}'):
             train_loss, metrics_train = self.one_epoch(model, loaders['train'])
             test_loss, metrics_test = self.one_epoch(model, loaders['test'], train=False)
             loss = {'train': train_loss, 'test': test_loss}
             metrics = {'train': metrics_train, 'test': metrics_test}
-            self.logger.log(loss, metrics, epoch, model, self.best_model_fname)   
+            self.logger.log(loss, metrics, epoch, model, self.best_model_fname)
         self.logger.draw_history()
 
 
 
-
-    
 @click.command()
 @click.option('-e', '--epochs', default=5, help='Number of epochs to train the model')
 @click.option('-d', '--data', default='data/ecg', help='Path to the dataset')
@@ -78,20 +77,22 @@ class Trainer:
 @click.option('-s', '--snr', default=15, help='Signal to noise ratio for the dataset')
 @click.option('-o', '--output', default='models/best.pth', help='Path to save the model')
 @click.option('--seed', default=42, help='Random seed')
-@click.option('--logfile', default='results/log.txt', help='Path to save the log file')
+@click.option('--logfile', default='logs/log.txt', help='Path to save the log file')
 @click.option('--debug', is_flag=True, help='Debug mode')
 def main(epochs, data, test_data, batch_size, snr, output, seed, logfile, debug):
     
-    model = ComplexUNet(128 * 128, sameW=False, activation='ro', diag=True)
-    model.load_weights('./models/best_before_ro.pth')
-    model.freeze_all_except_firs_last()
-    
+    # model = ComplexUNet(128 * 128, sameW=False, activation='ro', diag=True)
+    # model.load_weights('./models/best_new_diffW_ro.pth')
+    # model.load_weights('./models/best_ro.pth')
+    # model.freeze_all_except_firs_last()
+    model = create_model('models/with_metadata/best_new_diffW_ro_v2.pth')
+
     stft = STFT()
     
-    train_set = SignalDataset(data, snr_db=snr, stft=stft)
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=8)
-    test_set = SignalDataset(test_data, snr_db=snr, stft=stft)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
+    train_set = SignalDataset(data, snr_db=[5, 20], stft=stft)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=12)
+    test_set = SignalDataset(test_data, snr_db=[5, 20], stft=stft)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=12)
     loaders = {'train': train_loader, 'test': test_loader, 'stft': stft}
     
     trainer = Trainer(output, logfile, debug)

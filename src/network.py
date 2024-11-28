@@ -281,14 +281,15 @@ class ComplexUNet(nn.Module):
         self.up2 = ComplexUpBlock(512, 128, sameW=sameW, activation=self.act)
         self.up3 = ComplexUpBlock(256, 64, sameW=sameW, activation=self.act)
         
-        self.conv2 = ComplexConvLayer(64, 64, sameW=sameW, activation=self.act)
-        self.conv3 = ComplexConvLayer(64, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act)
+        self.conv2 = ComplexConvLayer(64, 32, sameW=sameW, activation=self.act)
+        self.conv3 = ComplexConvLayer(32, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act)
         self.sigma = nn.Sigmoid()
 
         self.out = torch.nn.Sequential(
-            ComplexConvLayer(2, 1, sameW=sameW, activation=self.act),
+            # ComplexConvLayer(2, 1, sameW=sameW, activation=self.act),
+            ComplexConvLayer(1, 1, sameW=sameW, activation=self.act),
             ComplexConvLayer(1, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
-            ComplexConvLayer(1, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
+            # ComplexConvLayer(1, 1, kernel_size=1, padding=0, sameW=sameW, activation=self.act),
         )
 
 
@@ -306,10 +307,10 @@ class ComplexUNet(nn.Module):
 
     def forward(self, x):
         b, c, h, w = x.size()
-        x = x.view(b * c, 1, h, w)
+        # x = x.view(b * c, 1, h, w)  # now we have 1 channel only
         
-        init = x
         x = self.normalize(x)
+        init = x
 
         if self.diag: 
             x = self.diag_in(x)
@@ -327,21 +328,25 @@ class ComplexUNet(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
 
-        x = self.out(torch.cat([init, x], dim=1))
+        # x = self.out(torch.cat([init, x], dim=1))
+        x = self.sigma(x)
+        x = x * init
+
         if self.diag: 
             x = self.diag_out(x)
             
         x = self.denormalize(x)
-        x = x.view(b, c, h, w)
+        # x = x.view(b, c, h, w)  # now we work with only one channel
         return x
 
     # custom weights initialization
     def load_weights(self, path):
-        w = torch.load(path)
+        w = torch.load(path, map_location='cpu')
         for name, param in self.named_parameters():
             if name in w:
                 if param.data.size() == w[name].size():
                     param.data = w[name]
+        del w
 
 
     def freeze_all_except_firs_last(self):
@@ -357,21 +362,52 @@ class ComplexUNet(nn.Module):
             param.requires_grad = True
 
 
+
+def create_model(ckpt_path=None, **kwargs):
+    if ckpt_path is None:
+        return ComplexUNet(**kwargs)
+    
+    pack = torch.load(ckpt_path, map_location='cpu')
+    if 'metadata' in pack.keys():  # new packs with metadata included
+        metadata = pack['metadata']
+        model = ComplexUNet(**metadata)
+        pack = pack['state_dict']
+    else:  # old packs, recreate model with given parameters
+        model = ComplexUNet(**kwargs)
+    model.load_state_dict(pack)
+    return model
+    
+
+
 if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    b, c, h, w = 1, 4, 128, 128
+    b, c, h, w = 8, 1, 128, 128
     x = torch.randn(b, c, h, w) + 1j * torch.randn(b, c, h, w)
     x = x.to(device)
+    
+    #### Old model without metadatas
+    # model = create_model('models/best_new_diffW_ro_v2.pth', dimension=h * w, sameW=False, activation='ro', diag=True)
+    # model = ComplexUNet(h * w, sameW=True, activation='ro', diag=True)
+    # model = model.to(device)
 
-    model = ComplexUNet(h * w, sameW=True, activation='ro', diag=True)
-    model = model.to(device)
+    # params = sum(p.numel() for p in model.parameters())
+    # print(f"Number of parameters: {params / 1e6:.2f} M")
 
-    params = sum(p.numel() for p in model.parameters())
-    print(f"Number of parameters: {params / 1e6:.2f} M")
+    # y = model(x)
+    # print("output:", y.size())
 
-    y = model(x)
-    print("output:", y.size())
-
-    metadata = model.metadata
-    print(metadata)
+    # metadata = model.metadata
+    # print(metadata)
+    
+    # pack = {
+        # 'metadata': metadata,
+        # 'state_dict': model.state_dict()
+    # }
+    
+    # torch.save(pack, 'models/with_metadata/best_new_diffW_ro_v2.pth')
+    
+    
+    ##### new model with metadata
+    model = create_model('models/with_metadata/best_new_diffW_ro_v2.pth')
+    print(f'Model loaded with metadata: {model.metadata}')
