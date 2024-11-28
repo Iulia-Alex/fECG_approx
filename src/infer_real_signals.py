@@ -111,7 +111,7 @@ if __name__ == '__main__':
     
     snr_db = [5, 20]
     
-    device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
 
     ckpt_path = 'models/latest_model_metadata.pth'
