@@ -18,6 +18,9 @@ class CustomLoss(torch.nn.Module):
         loss = torch.nan_to_num(loss, nan=0.0, posinf=0.0, neginf=0.0)
         loss = torch.mean(loss)
         return loss
+    
+    def normalize(self, x):
+        return x / torch.max(torch.abs(x))
 
 
 class ComplexMSE(torch.nn.Module):
@@ -41,30 +44,38 @@ class ComplexMAE(torch.nn.Module):
     
     
 class SignalMSE(CustomLoss):
-    def __init__(self, stft):
+    def __init__(self, stft, normalize=False):
         super().__init__()
         self.stft = stft
+        self.do_normalize = normalize
         
     def forward(self, y_true, y_pred, signal=False):
         self.check_input(y_pred)
         if not signal:
             y_true = self.stft.istft_batched(y_true)
             y_pred = self.stft.istft_batched(y_pred)
+        if do_normalize:
+            y_pred = self.normalize(y_pred)
+            y_true = self.normalize(y_true)
         mse = torch.nn.functional.mse_loss(y_true, y_pred, reduction='mean')
         mse = self.compute_loss_val(mse)
         return mse
     
-    
+
 class SignalMAE(CustomLoss):
-    def __init__(self, stft):
+    def __init__(self, stft, normalize=False):
         super().__init__()
         self.stft = stft
+        self.do_normalize = normalize
         
     def forward(self, y_true, y_pred, signal=False):
         self.check_input(y_pred)
         if not signal:
             y_true = self.stft.istft_batched(y_true)
             y_pred = self.stft.istft_batched(y_pred)
+        if self.do_normalize:
+            y_pred = self.normalize(y_pred)
+            y_true = self.normalize(y_true)
         mae = torch.nn.functional.l1_loss(y_true, y_pred, reduction='none')
         mae = self.compute_loss_val(mae)
         return mae
@@ -91,4 +102,4 @@ class ComposedLoss(torch.nn.Module):
         loss_signal = self.loss_signal(y_true, y_pred)
         loss_spec = self.loss_spec(y_true, y_pred)
         return loss_signal + loss_spec 
-        
+

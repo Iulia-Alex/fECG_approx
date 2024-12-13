@@ -3,6 +3,7 @@ iulia_old
 results
 logs
 tests
+*slurm*
 *.pyc
 *.pth
 *.log

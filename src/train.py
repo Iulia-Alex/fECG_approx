@@ -3,7 +3,7 @@ import torch
 from tqdm import tqdm
 
 from logger import Logger
-from loss import ComposedLoss, SignalMSE, SignalMAE
+from loss import ComposedLoss, SignalMSE, SignalMAE, ComplexMSE
 from fourier import STFT
 from metrics import PDR
 from network import create_model
@@ -43,6 +43,7 @@ class Trainer:
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
+                model.apply(model.W_clipper)
             
             metrics_dict = self.metrics(y, y_pred)
             total_metrics['prd'] += metrics_dict['prd']
@@ -54,45 +55,60 @@ class Trainer:
 
     def train(self, model, loaders, epochs):
         self.logger.max_epochs = epochs
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-        self.loss_fn = SignalMAE(loaders['stft'])
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+        self.loss_fn = SignalMSE(loaders['stft'])
+        # self.loss_fn = ComplexMSE()
         self.metrics = PDR(loaders['stft'])
         model = model.to(self.device)
-                
+        self.logger.log_model(model)
+        
         for epoch in tqdm(range(epochs), leave=False, bar_format='Epoch: {l_bar}{bar:10}{r_bar}{bar:-10b}'):
             train_loss, metrics_train = self.one_epoch(model, loaders['train'])
             test_loss, metrics_test = self.one_epoch(model, loaders['test'], train=False)
             loss = {'train': train_loss, 'test': test_loss}
             metrics = {'train': metrics_train, 'test': metrics_test}
             self.logger.log(loss, metrics, epoch, model, self.best_model_fname)
+            
+            # if epoch == 15:
+                # self.optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+            
         self.logger.draw_history()
 
 
-
+###### SHOULD RESOLVE METRICS MODULE FOR HERE
 @click.command()
 @click.option('-e', '--epochs', default=5, help='Number of epochs to train the model')
 @click.option('-d', '--data', default='data/ecg', help='Path to the dataset')
 @click.option('-t', '--test', 'test_data', default='data/test_ecg', help='Path to the test dataset')
-@click.option('-b', '--batch_size', default=2, help='Batch size for training')
+@click.option('-b', '--batch_size', default=8, help='Batch size for training')
+@click.option('-w', '--workers', default=2, help='Number of workers for the dataloader')
 @click.option('-s', '--snr', default=15, help='Signal to noise ratio for the dataset')
 @click.option('-o', '--output', default='models/best.pth', help='Path to save the model')
 @click.option('--seed', default=42, help='Random seed')
 @click.option('--logfile', default='logs/log.txt', help='Path to save the log file')
 @click.option('--debug', is_flag=True, help='Debug mode')
-def main(epochs, data, test_data, batch_size, snr, output, seed, logfile, debug):
+def main(epochs, data, test_data, batch_size, workers, snr, output, seed, logfile, debug):
     
     # model = ComplexUNet(128 * 128, sameW=False, activation='ro', diag=True)
     # model.load_weights('./models/best_new_diffW_ro.pth')
     # model.load_weights('./models/best_ro.pth')
     # model.freeze_all_except_firs_last()
-    model = create_model('models/with_metadata/best_new_diffW_ro_v2.pth')
+    model = create_model('models/best.pth')
+    
+    # model_settings = {
+    #     'dimension':128*128, 
+    #     'sameW':False, 
+    #     'activation':'ro', 
+    #     'diag':True
+    # }
+    # model = create_model(**model_settings)
 
     stft = STFT()
     
     train_set = SignalDataset(data, snr_db=[5, 20], stft=stft)
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=12)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=workers)
     test_set = SignalDataset(test_data, snr_db=[5, 20], stft=stft)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=12)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=workers)
     loaders = {'train': train_loader, 'test': test_loader, 'stft': stft}
     
     trainer = Trainer(output, logfile, debug)

@@ -150,7 +150,8 @@ def load_mat_physio(path):
 def main(model_path, signal_path, snr_db, index):
     
     model_path = 'models/best_ro.pth'
-    model = get_model(model_path, sizes=(128, 128), sameW=False, activation='ro', diag=True)
+    # model = get_model(model_path, sizes=(128, 128), sameW=False, activation='ro', diag=True)
+    model = create_model(model_path)
     model = model.to('cuda:1')
     stft = STFT()
     diffuser = Diffuser(500, snr_db=20)

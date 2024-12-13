@@ -50,12 +50,19 @@ class Logger:
         with open(self.log_path, 'a') as f:
             f.write(msg + '\n')
         tqdm.write(msg)
-        
-
-    def __log_model(self, model):    
+    
+    
+    def log_start(self):
+        msg = f'[INFO] Training started at {self.current_time}'
+        msg += f'\n[INFO] Best model will be saved as {self.best_model_fname}'
+        self.log_info(msg)
+    
+    
+    
+    def log_model(self, model):    
         with open(self.log_path, 'a') as f:
             metadata = model.metadata
-            f.write('Model metadata:\n')
+            f.write('[INFO] Model metadata:\n')
             for key, value in metadata.items():
                 f.write(f'{key}: {value}\n')
             f.write('\n')
@@ -63,11 +70,7 @@ class Logger:
     def log(self, loss, metrics, epoch, model, save_path):
         train_loss, test_loss = loss['train'], loss['test']
         metrics_train, metrics_test = metrics['train'], metrics['test']
-        self.__check_log_path()
-        
-        if epoch == 0:
-            self.__log_model(model)
-        
+        self.__check_log_path()        
         text = f'[Epoch {epoch + 1}/{self.max_epochs} ]\n'
         text += f'\tTrain: loss: {train_loss:.3e} | prd: {metrics_train["prd"]:.3f}\n'
         text += f'\tTest: loss: {test_loss:.3e} | prd: {metrics_test["prd"]:.3f}\n'

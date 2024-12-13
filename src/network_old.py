@@ -104,11 +104,7 @@ class ComplexConvLayer(ComplexLayer):
             )
             self.norm_real = nn.BatchNorm2d(out_channels)
             self.norm_imag = nn.BatchNorm2d(out_channels)
-
-    # overide in order to preserve proprieties of convolution on complex numbers
-    def combine(self, real, imag):
-        return (real - imag) + 1j * (real + imag)
-    
+            
 
     def forward(self, x):
         x_real, x_imag = self.extract_real_imag(x)
@@ -245,19 +241,8 @@ class ComplexUpBlock(ComplexLayer):
         return self.up(x)
 
 
-class WeightClipper:
-    def __init__(self, clip_value=1):
-        self.clip_value = clip_value
-
-    def __call__(self, module):
-        if hasattr(module, "weight"):
-            w = module.weight.data
-            w = torch.clamp(w, -self.clip_value, self.clip_value)
-            module.weight.data = w
-
-
 class ComplexUNet(nn.Module):
-    def __init__(self, dimension, sameW=False, activation='crelu', diag=False, clip_value=1):
+    def __init__(self, dimension, sameW=False, activation='crelu', diag=False):
         super().__init__()
         
         match activation:
@@ -273,8 +258,6 @@ class ComplexUNet(nn.Module):
             'activation': activation,
             'diag': diag,
         }
-        
-        self.W_clipper = WeightClipper(clip_value)
         
         self.diag = diag
         if diag:
@@ -345,10 +328,13 @@ class ComplexUNet(nn.Module):
         x = self.conv2(x)
         x = self.conv3(x)
 
+        # x = self.out(torch.cat([init, x], dim=1))
+        x = self.sigma(x)
+        x = x * init
+
         if self.diag: 
             x = self.diag_out(x)
             
-        x = self.sigma(x) * init
         x = self.denormalize(x)
         # x = x.view(b, c, h, w)  # now we work with only one channel
         return x
@@ -377,11 +363,8 @@ class ComplexUNet(nn.Module):
 
 
 
-
-
 def create_model(ckpt_path=None, **kwargs):
     if ckpt_path is None:
-        print(f'[INFO] Creating model with parameters: {kwargs} since no checkpoint was provided')
         return ComplexUNet(**kwargs)
     
     pack = torch.load(ckpt_path, map_location='cpu')
@@ -389,12 +372,9 @@ def create_model(ckpt_path=None, **kwargs):
         metadata = pack['metadata']
         model = ComplexUNet(**metadata)
         pack = pack['state_dict']
-        print(f'[INFO] Model loaded with metadata: {metadata} from {ckpt_path}')
     else:  # old packs, recreate model with given parameters
         model = ComplexUNet(**kwargs)
-        print(f'[INFO] Model created since no metadata was found in {ckpt_path}')
     model.load_state_dict(pack)
-    
     return model
     
 
