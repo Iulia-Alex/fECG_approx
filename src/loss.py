@@ -48,13 +48,14 @@ class SignalMSE(CustomLoss):
         super().__init__()
         self.stft = stft
         self.do_normalize = normalize
+        self.name = 'SignalMSE'
         
     def forward(self, y_true, y_pred, signal=False):
         self.check_input(y_pred)
         if not signal:
             y_true = self.stft.istft_batched(y_true)
             y_pred = self.stft.istft_batched(y_pred)
-        if do_normalize:
+        if self.do_normalize:
             y_pred = self.normalize(y_pred)
             y_true = self.normalize(y_true)
         mse = torch.nn.functional.mse_loss(y_true, y_pred, reduction='mean')
@@ -67,6 +68,7 @@ class SignalMAE(CustomLoss):
         super().__init__()
         self.stft = stft
         self.do_normalize = normalize
+        self.name = 'SignalMAE'
         
     def forward(self, y_true, y_pred, signal=False):
         self.check_input(y_pred)

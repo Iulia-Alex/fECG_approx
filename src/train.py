@@ -5,7 +5,7 @@ from tqdm import tqdm
 from logger import Logger
 from loss import ComposedLoss, SignalMSE, SignalMAE, ComplexMSE
 from fourier import STFT
-from metrics import PDR
+from metrics import MeticEvaluator
 from network import create_model
 from dataset import SignalDataset
 
@@ -21,7 +21,7 @@ class Trainer:
     def one_epoch(self, model, loader, train=True):
         model.train() if train else model.eval()
         total_loss = 0
-        total_metrics = {'prd':0.0}
+        total_metrics = {name: 0.0 for name in self.metrics.metrics_names}
         for x, y in tqdm(loader, leave=False, bar_format='Batch: {l_bar}{bar:10}{r_bar}{bar:-10b}'):
             x, y = x.to(self.device), y.to(self.device)
             
@@ -46,19 +46,21 @@ class Trainer:
                 model.apply(model.W_clipper)
             
             metrics_dict = self.metrics(y, y_pred)
-            total_metrics['prd'] += metrics_dict['prd']
+            for name, value in metrics_dict.items():
+                total_metrics[name] += value
                 
         loss = total_loss / len(loader)
-        total_metrics['prd'] /= len(loader)
+        for name in total_metrics:
+            total_metrics[name] /= len(loader)
         return loss, total_metrics
 
 
-    def train(self, model, loaders, epochs):
+    def train(self, model, loaders, epochs, **kwargs):
         self.logger.max_epochs = epochs
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
+        lr = kwargs.get('lr', 1e-3)
+        self.optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         self.loss_fn = SignalMSE(loaders['stft'])
-        # self.loss_fn = ComplexMSE()
-        self.metrics = PDR(loaders['stft'])
+        self.metrics = MeticEvaluator(loaders['stft'])
         model = model.to(self.device)
         self.logger.log_model(model)
         
@@ -75,7 +77,6 @@ class Trainer:
         self.logger.draw_history()
 
 
-###### SHOULD RESOLVE METRICS MODULE FOR HERE
 @click.command()
 @click.option('-e', '--epochs', default=5, help='Number of epochs to train the model')
 @click.option('-d', '--data', default='data/ecg', help='Path to the dataset')
@@ -93,7 +94,7 @@ def main(epochs, data, test_data, batch_size, workers, snr, output, seed, logfil
     # model.load_weights('./models/best_new_diffW_ro.pth')
     # model.load_weights('./models/best_ro.pth')
     # model.freeze_all_except_firs_last()
-    model = create_model('models/best.pth')
+    model = create_model('models/currently_best_372.pth')
     
     # model_settings = {
     #     'dimension':128*128, 

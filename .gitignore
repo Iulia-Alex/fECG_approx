@@ -1,9 +1,9 @@
 data
 iulia_old
 results
-logs
+*logs*
 tests
-*slurm*
+models
 *.pyc
 *.pth
 *.log

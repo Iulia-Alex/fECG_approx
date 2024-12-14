@@ -36,11 +36,9 @@ class Logger:
         plt.savefig(f'results/history_{self.best_model_fname}.png')
         plt.close()
         
-    
     def draw_from_file(self, path):
         raise NotImplementedError('This method is not implemented yet')
         
-
     def __check_log_path(self):
         if self.log_path is None:
             raise ValueError('[ERROR] Log path is not defined, please set the log_path attribute')
@@ -51,13 +49,10 @@ class Logger:
             f.write(msg + '\n')
         tqdm.write(msg)
     
-    
     def log_start(self):
         msg = f'[INFO] Training started at {self.current_time}'
         msg += f'\n[INFO] Best model will be saved as {self.best_model_fname}'
         self.log_info(msg)
-    
-    
     
     def log_model(self, model):    
         with open(self.log_path, 'a') as f:
@@ -72,8 +67,14 @@ class Logger:
         metrics_train, metrics_test = metrics['train'], metrics['test']
         self.__check_log_path()        
         text = f'[Epoch {epoch + 1}/{self.max_epochs} ]\n'
-        text += f'\tTrain: loss: {train_loss:.3e} | prd: {metrics_train["prd"]:.3f}\n'
-        text += f'\tTest: loss: {test_loss:.3e} | prd: {metrics_test["prd"]:.3f}\n'
+        text += f'\tTrain: loss: {train_loss:.3e} | '
+        for key, value in metrics_train.items():
+            text += f'{key}: {value:.3f} | '
+        text += '\n'
+        text += f'\tTest: loss: {test_loss:.3e} | '
+        for key, value in metrics_test.items():
+            text += f'{key}: {value:.3f} | '
+        text += '\n'
         if test_loss < self.best_loss:
             self.best_loss = test_loss
             pack = {'state_dict': model.state_dict(), 'metadata': model.metadata}

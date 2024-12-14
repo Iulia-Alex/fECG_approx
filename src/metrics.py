@@ -7,7 +7,6 @@ class PDR(torch.nn.Module):
     def __init__(self, stft):
         super().__init__()
         self.stft = stft
-        
 
     def forward(self, y_true, y_pred, signal=False):
         if not signal:
@@ -40,13 +39,25 @@ class PCC(torch.nn.Module):
         return float(pcc)
 
 
+class RMSE(torch.nn.Module):
+    def __init__(self, stft):
+        super().__init__()
+        self.stft = stft
+    
+    def forward(self, y_true, y_pred, signal=False):
+        if not signal:
+            y_true = self.stft.istft_batched(y_true)
+            y_pred = self.stft.istft_batched(y_pred)
+        
+        rmse = torch.sqrt(torch.mean((y_true - y_pred) ** 2))
+        return rmse.item()
 
 
 class MeticEvaluator:
-    def __init__(self, stft, metric_list=['pdr', 'pcc']):
+    def __init__(self, stft, metric_list=['pdr', 'pcc', 'rmse']):
         self.stft = stft
         self.metrics = self._get_metrics(metric_list)
-        
+        self.metrics_names = list(self.metrics.keys())
     
     def __call__(self, y_true, y_pred, signal=False):
         results = {}
@@ -61,6 +72,8 @@ class MeticEvaluator:
                 metrics[metric] = PDR(self.stft)
             elif metric == 'pcc':
                 metrics[metric] = PCC(self.stft)
+            elif metric == 'rmse':
+                metrics[metric] = RMSE(self.stft)
             else:
                 raise ValueError(f'Unknown metric: {metric}')
         return metrics
@@ -83,3 +96,7 @@ if __name__ == '__main__':
     pcc = PCC(stft)
     
     print(pcc(y_true, y_pred), pcc(y_true, y_true + 1e-3))
+    
+    rmse = RMSE(stft)
+    
+    print(rmse(y_true, y_pred), rmse(y_true, y_true + 1e-3))
