@@ -11,7 +11,7 @@ sns.set_style('darkgrid')
 # plt.rcParams['axes.grid'] = False
 
 from fourier import STFT
-from network import ComplexUNet
+from network import ComplexUNet, create_model
 from diffuser import Diffuser
 
 
@@ -33,8 +33,8 @@ def load_mat(path, random=False):
     
     mecg = torch.tensor(mecg, dtype=torch.float32)
     fecg = torch.tensor(fecg, dtype=torch.float32)
-    # mecg = mecg / mecg.abs().max()
-    # fecg = fecg / fecg.abs().max()
+    mecg = mecg / mecg.abs().max()
+    fecg = fecg / fecg.abs().max()
     mecg = resampler(mecg)
     fecg = resampler(fecg)
     
@@ -148,11 +148,13 @@ def load_mat_physio(path):
 @click.option('--snr_db', type=int, default=5)
 @click.option('-i', '--index', type=int, default=1)
 def main(model_path, signal_path, snr_db, index):
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    model_path = 'models/best_ro.pth'
+    model_path = 'models/latest_model_metadata.pth'
     # model = get_model(model_path, sizes=(128, 128), sameW=False, activation='ro', diag=True)
     model = create_model(model_path)
-    model = model.to('cuda:1')
+    model = model.to(device)
     stft = STFT()
     diffuser = Diffuser(500, snr_db=20)
     
@@ -200,9 +202,10 @@ def main(model_path, signal_path, snr_db, index):
     # plt.tight_layout()
     # plt.savefig('results/physio_setA_nans.png')
 
-
+    print("sum_ shape:", sum_.shape)
+    print("spec shape:", stft.stft(sum_).to(device).shape)
     
-    sum_spec = stft.stft(sum_).to('cuda:1')
+    sum_spec = stft.stft(sum_[0:1]).to(device)
     sum_spec = sum_spec[:, :-1, :]  # drop last freq bin
     sum_spec = sum_spec.unsqueeze(0)  # add batch dimension
     # sum_spec = sum_spec / 10.0
@@ -219,13 +222,13 @@ def main(model_path, signal_path, snr_db, index):
     
 
     # fecg = fecg.numpy()
-    fecg_spec = stft.stft(fecg).to('cuda:1')
+    fecg_spec = stft.stft(fecg).to(device)
     fecg_spec = fecg_spec[:, :-1, :]  # drop last freq bin
 
 
 
     fig, ax = plt.subplots(2, 2, figsize=(24, 12))
-    for i in range(4):
+    for i in range(1):
         if i == 1:
             ax[i // 2, i % 2].plot(sum_[i], label='true', c='g', linewidth=5)
             ax[(2 + i) // 2, (i + 2) % 2].imshow(sum_spec[0, i].abs().log1p().cpu().numpy(), aspect='auto', origin='lower')

@@ -347,8 +347,19 @@ class ComplexUNet(nn.Module):
 
         if self.diag: 
             x = self.diag_out(x)
-            
-        x = self.sigma(x) * init
+
+        # x = self.sigma(x) * init
+        # magnitude = torch.abs(x)
+        # mask = torch.sigmoid(magnitude)  # mask e real, intre 0 si 1
+        # x = mask * init  # aplica masca pe spectrograma originala
+
+        # in forward() din network.py
+        x_cpu = x.cpu()
+        x_real, x_imag = torch.real(x_cpu), torch.imag(x_cpu)
+        mask = torch.sigmoid(x_real) + 1j * torch.sigmoid(x_imag)
+        print(f"Mask: real min={torch.real(mask).min():.4f}, max={torch.real(mask).max():.4f}, mean={torch.real(mask).mean():.4f}")
+        x = mask.to(x.device) * init
+
         x = self.denormalize(x)
         # x = x.view(b, c, h, w)  # now we work with only one channel
         return x

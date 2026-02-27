@@ -14,6 +14,7 @@ from network import create_model
 from diffuser import Diffuser
 from metrics import MeticEvaluator
 from loss import SignalMSE, SignalMAE
+from dataset import load_mat_ours
 
 import sys
 
@@ -50,18 +51,19 @@ def create_signal_from_batches(specs, stft, original_size, samples_size=1915, ov
 if __name__ == '__main__':
     
     # signals_path = 'data/test_ecg2'
-    signals_path = 'data/test_ecg'
-    signals_path = 'data/abdominal_fecg'
-    save_signals_path = f'results/test_ecg'
+    # signals_path = 'data/test_ecg'
+    signals_path = '../data'
+    save_signals_path = f'../results'
     debug = True
     
     snr_db = [5, 20]
     
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'mps'
     device = torch.device(device)
     print(f'Using device: {device}')
 
-    ckpt_path = 'models/best.pth'
+    ckpt_path = '../models/latest_model_metadata.pth'
     model = create_model(ckpt_path)
     model = model.to(device)
     model = model.eval()
@@ -82,12 +84,12 @@ if __name__ == '__main__':
     for file in tqdm(files):
         signal_path = os.path.join(signals_path, file)
     
-        # mecg, fecg = load_mat(signal_path)
-        # sum_ = mecg + fecg
-        # sum_ = diffuser(sum_)
+        mecg, fecg = load_mat_ours(signal_path)
+        sum_ = mecg + fecg
+        sum_ = diffuser(sum_)
         # sum_, peaks = load_mat_physio(signal_path)
         # sum_ = load_mat_iulia(signal_path)
-        sum_, fecg = load_mat_abdominal(signal_path)
+        # sum_, fecg = load_mat_abdominal(signal_path)
         if debug:
             print(f'SUM: {sum_.shape}, FECG: {fecg.shape}')
 
@@ -146,17 +148,29 @@ if __name__ == '__main__':
 
         
         signals = {
-            # 'original_fecg': fecg.numpy(),
-            # 'original_mecg': mecg.numpy(),
+            'original_fecg': fecg.numpy(),
+            'original_mecg': mecg.numpy(),
             'predicted_fecg': signal_pred.numpy(),
             'noisy_signal': sum_.numpy(),
             # 'peaks': peaks.numpy()
         }
         
         save_path = os.path.join(save_signals_path, file)
-        # savemat(save_path, signals)
-        # tqdm.write(f'Saved {save_path} with {signal_pred.shape[-1]} samples, MSE: {mse}, PDR: {pdr["prd"]}')
-        # tqdm.write(f'Saved {save_path} with {signal_pred.shape[-1]} samples and {peaks.shape[0]} peaks')
+        savemat(save_path, signals)
+
+        # Comparative plot of all signals on channel 0, time interval [2000:5000]
+        ch = 0
+        t_start, t_end = 2000, 5000
+        fig, axes = plt.subplots(len(signals), 1, figsize=(14, 2.5 * len(signals)), sharex=True)
+        for ax, (name, sig) in zip(axes, signals.items()):
+            ax.plot(sig[ch, t_start:t_end])
+            ax.set_ylabel(name, fontsize=8)
+        axes[-1].set_xlabel('Sample')
+        fig.suptitle(f'{file} — channel {ch}, samples {t_start}:{t_end}')
+        plt.tight_layout()
+        plot_path = os.path.join(save_signals_path, file.replace('.mat', '_comparison.png'))
+        plt.savefig(plot_path, dpi=150)
+        plt.close(fig)
 
 
     mse_list = torch.tensor(mse_list)
