@@ -1,7 +1,7 @@
 # fECG Extraction from Movement ECG — Experiment Log
 
-**Last updated:** 2026-03-29
-**Active jobs:** 1294 (v5 ep154), 1311 (v6 ep42), 1310 (v7 ep15) — v1 DONE
+**Last updated:** 2026-04-04
+**Active jobs:** 1319 (v8 ep20+, Lenovo6) — v1 DONE, v5 DONE, v6 stopped, v7 stopped
 
 ---
 
@@ -76,7 +76,7 @@ STFT parameters: `n_fft=256, hop=10, win_len=128, FS=1000 Hz` → shape `(129, 4
 
 ---
 
-### 3.2 Loss Function: ComplexMSE → SignalMSE ⭐ most impactful
+### 3.2 Loss Function: ComplexMSE → SignalMSE (most impactful)
 
 | | ComplexMSE | **SignalMSE** |
 |---|---|---|
@@ -109,25 +109,25 @@ Overlapping CPU data loading (STFT computation) with GPU training halved epoch t
 
 ## 4. Experiments Comparison
 
-| | **v1** | **v2** | **v3** ❌ | **v4** ❌ | **v5** | **v6** | **v7** |
-|---|---|---|---|---|---|---|---|
-| **Script** | `train_movement.py` | `archive/train_movement_v2.py` | `archive/train_movement_v3.py` | `archive/train_movement_v4.py` | `train_movement_v5.py` | `train_movement_v6.py` | `train_movement_v7.py` |
-| **Architecture** | ComplexUNet | Paper-style ComplexUNet | ComplexUNet (=v1) | ComplexUNet (=v1) | ComplexUNet (=v1) | ComplexUNet (=v1) | **ComplexUNetV7 (paper)** |
-| **Params** | 0.59 M | 7.13 M | 0.59 M | 0.59 M | 0.59 M | 0.59 M | **1.87 M** |
-| **Conv** | Shared Re/Im | Separate (cross-mix) | Shared | Shared | Shared | Shared | **Split Re/Im (no cross-mix)** |
-| **Activation** | LeakyReLU(0.2) | RoActivation | LeakyReLU | LeakyReLU | LeakyReLU | LeakyReLU | **RoActivation** |
-| **Skip conn.** | Addition | Concat | Addition | Addition | Addition | Addition | **Concatenation** |
-| **Diagonal** | Mag. scaling exp(β) | Phase rot. e^{iβ} | Mag. scaling | Mag. scaling | Mag. scaling | Mag. scaling | **Phase rot. e^{iβ}** |
-| **FS / Spec** | 1000 Hz / 128×400 | 500 Hz / 128×128 | 1000 / 128×400 | 1000 / 128×400 | 1000 / 128×400 | 1000 / 128×400 | 1000 / 128×400 |
-| **Loss** | SignalMSE | SignalMSE | MSE+5×PeakMSE+0.1×CplxMSE | MSE+3×AmpW | MSE+3×AmpW | MSE+AmpW+Baseline | **SignalMAE (L1)** |
-| **Optimizer** | AdamW | AdamW | AdamW | AdamW | AdamW | AdamW | **Adam** |
-| **Warm start** | No | No | No | v1 best | No | **v1 best** | No |
-| **LR** | 1e-4 | 1e-4 | 1e-4 | 1e-5 | 1e-4 | 1e-4 | 1e-4 |
-| **BS** | 32 | 32 | 32 | 32 | 32 | 32 | **16** |
-| **Job** | 1276 | 1284 ✅ | 1287 ❌ | 1292 ❌ | 1294 | 1311 | 1310 |
-| **Node** | Lenovo2 | Lenovo6 | Lenovo2 | Lenovo2 | Lenovo2 | Lenovo2 | Lenovo6 |
-| **Best val loss** | **0.014745** @ ep199 ✅ | 0.03217 @ ep99 | — | 0.02319 @ ep36 | 0.023846 @ ep154 | 0.053158 @ ep42 | 0.085450 @ ep15 |
-| **Status** | DONE | DONE | CANCELLED | CANCELLED | Running ep154 | Running ep42 | Running ep15 |
+| | **v1** | **v2** | **v3** | **v4** | **v5** | **v6** | **v7** | **v8** |
+|---|---|---|---|---|---|---|---|---|
+| **Script** | `train_movement.py` | `archive/train_movement_v2.py` | `archive/train_movement_v3.py` | `archive/train_movement_v4.py` | `train_movement_v5.py` | `train_movement_v6.py` | `train_movement_v7.py` | `train_movement_v8.py` |
+| **Architecture** | ComplexUNet | Paper-style ComplexUNet | ComplexUNet (=v1) | ComplexUNet (=v1) | ComplexUNet (=v1) | ComplexUNet (=v1) | ComplexUNetV7 | **ComplexUNetV7** |
+| **Params** | 0.59 M | 7.13 M | 0.59 M | 0.59 M | 0.59 M | 0.59 M | 1.87 M | **1.87 M** |
+| **Conv** | Shared Re/Im | Separate (cross-mix) | Shared | Shared | Shared | Shared | Split Re/Im | **Split Re/Im** |
+| **Activation** | LeakyReLU(0.2) | RoActivation | LeakyReLU | LeakyReLU | LeakyReLU | LeakyReLU | RoActivation | **RoActivation** |
+| **Skip conn.** | Addition | Concat | Addition | Addition | Addition | Addition | Concat | **Concat** |
+| **Diagonal** | Mag. scaling exp(β) | Phase rot. e^{iβ} | Mag. scaling | Mag. scaling | Mag. scaling | Mag. scaling | Phase rot. | **Phase rot.** |
+| **FS / Spec** | 1000 Hz / 128×400 | 500 Hz / 128×128 | 1000/128×400 | 1000/128×400 | 1000/128×400 | 1000/128×400 | 1000/128×400 | **1000/128×400** |
+| **Loss** | SignalMSE | SignalMSE | MSE+5×PeakMSE+0.1×CplxMSE | MSE+3×AmpW | MSE+3×AmpW | MSE+AmpW+Baseline | SignalMAE (L1) | **SignalMSE** |
+| **Optimizer** | AdamW | AdamW | AdamW | AdamW | AdamW | AdamW | Adam | **AdamW** |
+| **Warm start** | No | No | No | v1 best | No | v1 best | No | No |
+| **LR** | 1e-4 | 1e-4 | 1e-4 | 1e-5 | 1e-4 | 1e-4 | 1e-4 | 1e-4 |
+| **BS** | 32 | 32 | 32 | 32 | 32 | 32 | 16 | **16** |
+| **Job** | 1276 | 1284 | 1287 | 1292 | 1294 | 1311 | 1310 | 1319 |
+| **Node** | Lenovo2 | Lenovo6 | Lenovo2 | Lenovo2 | Lenovo2 | Lenovo2 | Lenovo6 | Lenovo6 |
+| **Best val loss** | **0.014745** @ ep199 | 0.03217 @ ep99 | — | 0.02319 @ ep36 | 0.022473 @ ep200 | 0.052952 @ ep67 | 0.081819 @ ep30 | 0.049408 @ ep16 |
+| **Status** | DONE | DONE | CANCELLED | CANCELLED | DONE | stopped (plateau) | stopped (L1 suppresses peaks) | running |
 
 ---
 
@@ -145,7 +145,7 @@ loss = F.mse_loss(pred_time, fecg_time)
 ```
 Result: peak amplitudes comparable to v1 but more baseline noise; paper architecture (7.13M params) doesn't outperform v1 (0.59M).
 
-### v3 — SignalMSE + PeakMSE + ComplexMSE ❌ (cancelled ep 101)
+### v3 — SignalMSE + PeakMSE + ComplexMSE (cancelled ep 101)
 ```
 loss = signal_mse + 5.0 * peak_mse + 0.1 * complex_mse
 ```
@@ -155,7 +155,7 @@ Where `peak_mse` uses a hard threshold mask (|signal| > 3×std) dilated ±40 sam
 
 **Lesson learned:** ComplexMSE must never be combined with a loss that requires correct amplitudes — even at small weight.
 
-### v4 — SignalMSE + AmpWeightedMSE, warm start from v1 ❌ (cancelled ep 37)
+### v4 — SignalMSE + AmpWeightedMSE, warm start from v1 (cancelled ep 37)
 ```
 w = (|target| / max|target|)²
 loss = signal_mse + 3.0 * mean((pred - target)² * w)
@@ -164,7 +164,7 @@ loss = signal_mse + 3.0 * mean((pred - target)² * w)
 
 **Lesson learned:** changing loss at fine-tuning doesn't work — model needs to learn representations for the new objective from scratch.
 
-### v5 — SignalMSE + AmpWeightedMSE, from scratch ← current
+### v5 — SignalMSE + AmpWeightedMSE, from scratch (DONE)
 ```
 w = (|target| / max|target|)²          # soft: 0 on baseline, 1 on R-peaks
 loss = signal_mse + 3.0 * mean((pred - target)² * w)
@@ -209,50 +209,64 @@ Cancelled: amplitude suppression from 0.1×ComplexMSE. R-peaks at ~50–60% GT.
 
 Cancelled: immediate train/val gap from ep 1 (fine-tuning with different loss). Best val 0.02319.
 
-### v5 — Job 1294 — running (ep 154/200)
+### v5 — Job 1294 — DONE (ep 200/200)
 
 **Hardware:** Lenovo2, Quadro M4000 8 GB
 **Config:** BS=32, LR=1e-4, WD=1e-5, patience=15, max 200 epochs
 **Init:** random (no warm start)
 **Loss:** SignalMSE + 3×AmpWeightedMSE
+**Best val loss: 0.022473 @ ep200**
 
 | Epoch | Val loss | Notes |
 |---|---|---|
 | 1 | ~0.25 | high due to AmpWeightedMSE×3 scale |
-| 5 | 0.09359 | — |
-| 20 | ~0.050 | — |
 | 35 | 0.03546 | — |
-| 75 | 0.028499 | — |
 | 81 | 0.027981 | — |
-| 154 | **0.023846** | best so far (as of 2026-03-29) |
+| 154 | 0.023846 | — |
+| 200 | **0.022473** | **BEST — final epoch** |
 
-### v6 — Job 1311 — running (ep 42/227)
+Inference (ep200): peaks ~95% GT, baseline noisier than v1. Sem3 near-perfect.
+
+### v6 — Job 1311 — STOPPED (ep 67, plateau)
 
 **Hardware:** Lenovo2, Quadro M4000 8 GB
-**Config:** BS=32, LR=1e-4, WD=1e-5, patience=15, max 200 epochs
+**Config:** BS=32, LR=1e-4, WD=1e-5, patience=15
 **Init:** warm start from v1 best checkpoint
 **Loss:** SignalMSE + AmpWeightedMSE + BaselinePenalty
+**Best val loss: 0.052952 @ ep67**
 
-| Epoch | Val loss | Notes |
-|---|---|---|
-| 1 | ~0.046 | warm start; loss landscape changes from v1's SignalMSE |
-| 26 | 0.053158 | best so far |
-| 42 | **0.053158** | best (as of 2026-03-29) — possibly plateauing |
+Stopped manually — val loss flat at 0.052–0.053 for 25+ epochs with no improvement trend.
 
-### v7 — Job 1310 — running (ep 15/204)
+### v7 — Job 1310 — STOPPED (ep 30, L1 suppresses peaks)
 
 **Hardware:** Lenovo6, Quadro M4000 8 GB
-**Config:** BS=16, LR=1e-4, patience=15, max 200 epochs (BS=16 due to RoActivation 3× memory)
+**Config:** BS=16, LR=1e-4, patience=15 (BS=16 — RoActivation 3× memory overhead)
+**Init:** random
+**Loss:** SignalMAE (L1)
+**Architecture:** ComplexUNetV7 (paper arch, corrected)
+**Best val loss: 0.081819 @ ep30**
+
+Stopped: L1 loss fundamentally suppresses R-peaks. Peaks are ~8% of signal — L1 minimises median error so the model ignores them. At ep30 peaks were still suppressed vs GT with no improvement trend. Replaced by v8 (same arch + MSE).
+
+### v8 — Job 1319 — running (ep 20+)
+
+**Hardware:** Lenovo6, Quadro M4000 8 GB
+**Config:** BS=16, LR=1e-4, WD=1e-5, patience=15, max 200 epochs
 **Init:** random (no warm start)
-**Loss:** SignalMAE (L1, paper's loss function)
-**Architecture:** ComplexUNetV7 — paper architecture with corrected split-conv and phase-rotation diagonal
+**Loss:** SignalMSE — same as v1, paper architecture
+**Architecture:** ComplexUNetV7 (1.87M) — paper arch + MSE (not tested before)
+**Epoch time:** ~2.1 h/epoch
 
 | Epoch | Val loss | Notes |
 |---|---|---|
-| 1 | ~0.095 | — |
-| 8 | 0.087x | peaks visible, amplitudes still calibrating |
-| 14 | 0.086466 | peaks better, Ch3 excellent |
-| 15 | **0.085450** | best so far (as of 2026-03-29) |
+| 1 | 0.093784 | — |
+| 6 | 0.057421 | — |
+| 10 | 0.055419 | — |
+| 15 | 0.052099 | — |
+| 16 | **0.049408** | **best so far** |
+| 20 | 0.056401 | spike (normal) |
+
+At ep16, v8 already better than v7-L1 at ep30 on peak clarity. v1 at ep18 was worse than v8 at ep15 — architecture converges faster.
 
 ---
 
