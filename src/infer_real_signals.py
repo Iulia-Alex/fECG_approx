@@ -52,14 +52,14 @@ if __name__ == '__main__':
     
     # signals_path = 'data/test_ecg2'
     # signals_path = 'data/test_ecg'
-    signals_path = '../data'
+    signals_path = '../data/fecgsyn'
     save_signals_path = f'../results'
     debug = True
     
     snr_db = [5, 20]
     
-    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    device = 'mps'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # device = 'mps'
     device = torch.device(device)
     print(f'Using device: {device}')
 

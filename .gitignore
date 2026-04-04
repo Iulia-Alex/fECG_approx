@@ -1,12 +1,31 @@
-data
-iulia_old
-results
-*logs*
-tests
-models
+## --- data / large output ---
+data/
+results/
+models/
+models_2026/
+plots_2026/
+logs/
+iulia_old/
+tests/
+
+## --- file types (large / generated) ---
 *.pyc
 *.pth
 *.log
 *.png
 *.jpg
 *.mat
+*.pdf
+*.xlsx
+
+## --- Python / system ---
+__pycache__/
+*.py[cod]
+.DS_Store
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+## --- SLURM ---
+slurm-*.out
+experiments.xlsx
