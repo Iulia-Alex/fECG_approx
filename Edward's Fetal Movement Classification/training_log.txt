@@ -1,0 +1,39 @@
+Phase 7: Precision Res-U-Net | Stride: 250 | LR: 1e-05
+Epoch 001 | Train Loss: 1.9982 | Val Loss: 1.8742 | ASPP [d=1: 0.4039 | d=2: 0.3980 | d=4: 0.3942 | d=8: 0.3946] -> dominant d=1
+--> Saved New Best Model
+Epoch 002 | Train Loss: 1.6066 | Val Loss: 1.4498 | ASPP [d=1: 0.3722 | d=2: 0.3738 | d=4: 0.3718 | d=8: 0.3873] -> dominant d=8
+--> Saved New Best Model
+Epoch 003 | Train Loss: 1.3868 | Val Loss: 1.3479 | ASPP [d=1: 0.3637 | d=2: 0.3611 | d=4: 0.3626 | d=8: 0.3807] -> dominant d=8
+--> Saved New Best Model
+Epoch 004 | Train Loss: 1.2937 | Val Loss: 1.2712 | ASPP [d=1: 0.3571 | d=2: 0.3518 | d=4: 0.3549 | d=8: 0.3793] -> dominant d=8
+--> Saved New Best Model
+Epoch 005 | Train Loss: 1.2335 | Val Loss: 1.4858 | ASPP [d=1: 0.3583 | d=2: 0.3552 | d=4: 0.3560 | d=8: 0.3817] -> dominant d=8
+Epoch 006 | Train Loss: 1.2115 | Val Loss: 1.2375 | ASPP [d=1: 0.3544 | d=2: 0.3537 | d=4: 0.3540 | d=8: 0.3820] -> dominant d=8
+--> Saved New Best Model
+Epoch 007 | Train Loss: 1.2080 | Val Loss: 1.2412 | ASPP [d=1: 0.3487 | d=2: 0.3506 | d=4: 0.3525 | d=8: 0.3813] -> dominant d=8
+Epoch 008 | Train Loss: 1.1787 | Val Loss: 1.2185 | ASPP [d=1: 0.3441 | d=2: 0.3489 | d=4: 0.3487 | d=8: 0.3804] -> dominant d=8
+--> Saved New Best Model
+Epoch 009 | Train Loss: 1.1609 | Val Loss: 1.2229 | ASPP [d=1: 0.3409 | d=2: 0.3463 | d=4: 0.3470 | d=8: 0.3804] -> dominant d=8
+Epoch 010 | Train Loss: 1.1436 | Val Loss: 1.2016 | ASPP [d=1: 0.3463 | d=2: 0.3531 | d=4: 0.3522 | d=8: 0.3851] -> dominant d=8
+--> Saved New Best Model
+Epoch 011 | Train Loss: 1.1239 | Val Loss: 1.1504 | ASPP [d=1: 0.3434 | d=2: 0.3507 | d=4: 0.3488 | d=8: 0.3826] -> dominant d=8
+--> Saved New Best Model
+Epoch 012 | Train Loss: 1.1117 | Val Loss: 1.1602 | ASPP [d=1: 0.3400 | d=2: 0.3479 | d=4: 0.3450 | d=8: 0.3829] -> dominant d=8
+Epoch 013 | Train Loss: 1.0976 | Val Loss: 1.3483 | ASPP [d=1: 0.3403 | d=2: 0.3527 | d=4: 0.3459 | d=8: 0.3848] -> dominant d=8
+Epoch 014 | Train Loss: 1.0877 | Val Loss: 1.1709 | ASPP [d=1: 0.3396 | d=2: 0.3509 | d=4: 0.3458 | d=8: 0.3843] -> dominant d=8
+Epoch 015 | Train Loss: 1.0820 | Val Loss: 1.1431 | ASPP [d=1: 0.3402 | d=2: 0.3511 | d=4: 0.3446 | d=8: 0.3834] -> dominant d=8
+--> Saved New Best Model
+Epoch 016 | Train Loss: 1.0636 | Val Loss: 1.1260 | ASPP [d=1: 0.3350 | d=2: 0.3464 | d=4: 0.3407 | d=8: 0.3831] -> dominant d=8
+--> Saved New Best Model
+Epoch 017 | Train Loss: 1.0556 | Val Loss: 1.1403 | ASPP [d=1: 0.3405 | d=2: 0.3528 | d=4: 0.3453 | d=8: 0.3860] -> dominant d=8
+Epoch 018 | Train Loss: 1.0457 | Val Loss: 1.1367 | ASPP [d=1: 0.3348 | d=2: 0.3470 | d=4: 0.3412 | d=8: 0.3861] -> dominant d=8
+Epoch 019 | Train Loss: 1.0400 | Val Loss: 1.1880 | ASPP [d=1: 0.3319 | d=2: 0.3453 | d=4: 0.3399 | d=8: 0.3852] -> dominant d=8
+Epoch 020 | Train Loss: 1.0288 | Val Loss: 1.1454 | ASPP [d=1: 0.3331 | d=2: 0.3456 | d=4: 0.3401 | d=8: 0.3859] -> dominant d=8
+Epoch 021 | Train Loss: 1.0176 | Val Loss: 1.1433 | ASPP [d=1: 0.3332 | d=2: 0.3457 | d=4: 0.3398 | d=8: 0.3862] -> dominant d=8
+Epoch 022 | Train Loss: 1.0184 | Val Loss: 1.1319 | ASPP [d=1: 0.3330 | d=2: 0.3467 | d=4: 0.3409 | d=8: 0.3861] -> dominant d=8
+Epoch 023 | Train Loss: 1.0093 | Val Loss: 1.1047 | ASPP [d=1: 0.3300 | d=2: 0.3452 | d=4: 0.3400 | d=8: 0.3867] -> dominant d=8
+--> Saved New Best Model
+Epoch 024 | Train Loss: 1.0014 | Val Loss: 1.1168 | ASPP [d=1: 0.3285 | d=2: 0.3425 | d=4: 0.3387 | d=8: 0.3853] -> dominant d=8
+Epoch 025 | Train Loss: 0.9919 | Val Loss: 1.1564 | ASPP [d=1: 0.3331 | d=2: 0.3472 | d=4: 0.3422 | d=8: 0.3870] -> dominant d=8
+Epoch 026 | Train Loss: 0.9874 | Val Loss: 1.0584 | ASPP [d=1: 0.3295 | d=2: 0.3427 | d=4: 0.3383 | d=8: 0.3856] -> dominant d=8
+--> Saved New Best Model
